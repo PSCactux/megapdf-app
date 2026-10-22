@@ -13,6 +13,7 @@ import { htmlToPdf, textToHtml } from "../convert/render";
 import { pdfToDocx, pdfToImages, pdfToText, pdfToXlsx } from "../convert/export";
 import { type Change, compareDocuments } from "./compare";
 import { appendOutline, graftPages } from "./graft";
+import { repairXrefChain } from "./incremental";
 import * as review from "./review";
 import * as replace from "./replace";
 import * as formData from "./formData";
@@ -65,12 +66,18 @@ export class Engine {
   private unsaved = new Set<string>();
 
   /** Abre el documento y devuelve si hace falta contraseña antes de poder leerlo. */
-  open(id: string, bytes: Uint8Array): { needsPassword: boolean } {
-    const doc = mupdf.Document.openDocument(bytes, "application/pdf");
+  /**
+   * `repaired`: el archivo tenía la cadena de guardados rota (versiones anteriores de MegaPDF al
+   * guardar dos veces un PDF con firmas) y se ha reparado al abrirlo; hay que guardarlo.
+   */
+  open(id: string, bytes: Uint8Array): { needsPassword: boolean; repaired: boolean } {
+    const fixed = repairXrefChain(bytes);
+    const doc = mupdf.Document.openDocument(fixed ?? bytes, "application/pdf");
     this.docs.set(id, doc);
-    this.fileBytes.set(id, bytes.slice());
+    this.fileBytes.set(id, (fixed ?? bytes).slice());
     if (!doc.needsPassword()) this.startJournal(id);
-    return { needsPassword: doc.needsPassword() };
+    if (fixed) this.unsaved.add(id);
+    return { needsPassword: doc.needsPassword(), repaired: !!fixed };
   }
 
   unlock(id: string, password: string): boolean {
@@ -161,7 +168,7 @@ export class Engine {
     const options = incremental
       ? "incremental"
       : [this.mustRewrite.has(id) ? "garbage=compact" : "", protection ? security.encryptOptions(protection) : ""].filter(Boolean).join(",");
-    const bytes = this.subsetOnSave(doc, incremental, options) ?? doc.saveToBuffer(options).asUint8Array().slice();
+    const bytes = checked(doc, incremental, this.subsetOnSave(doc, incremental, options) ?? doc.saveToBuffer(options).asUint8Array().slice());
     this.pendingSave.set(id, bytes);
     return bytes;
   }
@@ -190,7 +197,7 @@ export class Engine {
     const doc = this.pdf(id);
     if (!this.history(id).dirty) return this.fileBytes.get(id)!.slice();
     const incremental = this.signatureFields(doc).length > 0 && doc.canBeSavedIncrementally();
-    return doc.saveToBuffer(incremental ? "incremental" : "").asUint8Array().slice();
+    return checked(doc, incremental, doc.saveToBuffer(incremental ? "incremental" : "").asUint8Array().slice());
   }
 
   /** El documento abierto tiene cambios que no están en ningún archivo. */
@@ -817,7 +824,7 @@ export class Engine {
 
   /** Si un PDF tiene contraseña de apertura (para pedirla antes de insertarlo o unirlo). */
   needsPassword(bytes: Uint8Array): boolean {
-    const doc = mupdf.Document.openDocument(bytes, "application/pdf");
+    const doc = mupdf.Document.openDocument(repairXrefChain(bytes) ?? bytes, "application/pdf");
     try {
       return doc.needsPassword();
     } finally {
@@ -827,7 +834,7 @@ export class Engine {
 
   /** Copia sin cifrar de un PDF con contraseña de apertura; null si la contraseña no es correcta. */
   decryptPdf(bytes: Uint8Array, password: string): Uint8Array | null {
-    const doc = mupdf.Document.openDocument(bytes, "application/pdf").asPDF();
+    const doc = mupdf.Document.openDocument(repairXrefChain(bytes) ?? bytes, "application/pdf").asPDF();
     if (!doc) throw new Error(t("No es un PDF válido"));
     try {
       if (!doc.authenticatePassword(password)) return null;
@@ -852,7 +859,7 @@ export class Engine {
    * `locked`: tiene contraseña y no se ha podido mirar.
    */
   searchFile(bytes: Uint8Array, query: string): { locked: boolean; count: number; hits: { page: number; snippet: Snippet }[] } {
-    const doc = mupdf.Document.openDocument(bytes, "application/pdf");
+    const doc = mupdf.Document.openDocument(repairXrefChain(bytes) ?? bytes, "application/pdf");
     try {
       if (doc.needsPassword()) return { locked: true, count: 0, hits: [] };
       let count = 0;
@@ -967,7 +974,7 @@ export class Engine {
 
   /** Diferencias de texto entre otra versión (anterior) y el documento abierto. */
   compare(id: string, previous: Uint8Array): Change[] {
-    const old = mupdf.Document.openDocument(previous, "application/pdf");
+    const old = mupdf.Document.openDocument(repairXrefChain(previous) ?? previous, "application/pdf");
     if (old.needsPassword()) throw new Error(t("La otra versión está protegida con contraseña"));
     try {
       return compareDocuments(old, this.get(id));
@@ -1111,8 +1118,28 @@ function renderPage(page: mupdf.Page, scale: number): mupdf.Pixmap {
   return pix;
 }
 
+/**
+ * Comprueba un PDF recién guardado antes de darlo por bueno. Al guardar por anexión, MuPDF
+ * puede escribir mal el enlace con la sección anterior (a partir del segundo guardado de la
+ * sesión): se corrige. Si aun así no se abre con las mismas páginas, no se guarda.
+ */
+function checked(doc: mupdf.PDFDocument, incremental: boolean, bytes: Uint8Array): Uint8Array {
+  const out = incremental ? (repairXrefChain(bytes) ?? bytes) : bytes;
+  const copy = mupdf.Document.openDocument(out, "application/pdf");
+  try {
+    if (copy.needsPassword()) return out;
+    const pdf = copy.asPDF()!;
+    const pages = pdf.countPages();
+    const ok = pages === doc.countPages() && Array.from({ length: pages }, (_, i) => pdf.findPage(i)).every((p) => p.isDictionary());
+    if (!ok) throw new Error(t("No se ha guardado: el archivo resultante no se podía abrir bien. El documento abierto sigue igual; prueba con «Guardar como…»."));
+    return out;
+  } finally {
+    copy.destroy();
+  }
+}
+
 function openSource(bytes: Uint8Array, position?: number): mupdf.PDFDocument {
-  const doc = mupdf.Document.openDocument(bytes, "application/pdf").asPDF();
+  const doc = mupdf.Document.openDocument(repairXrefChain(bytes) ?? bytes, "application/pdf").asPDF();
   if (!doc) throw new Error(position ? t("El archivo nº {n} no es un PDF válido", { n: position }) : t("El PDF no es un PDF válido"));
   if (doc.needsPassword()) {
     throw new Error(

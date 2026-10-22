@@ -19,7 +19,7 @@ function makePdf(texts: string[], saveOptions = ""): Uint8Array {
 describe("Engine", () => {
   it("lee páginas, tamaños y marcadores", () => {
     const engine = new Engine();
-    expect(engine.open("a", makePdf(["uno", "dos", "tres"]))).toEqual({ needsPassword: false });
+    expect(engine.open("a", makePdf(["uno", "dos", "tres"]))).toEqual({ needsPassword: false, repaired: false });
     const info = engine.info("a");
     expect(info.pages).toHaveLength(3);
     expect(info.pages[0]).toEqual({ width: 595, height: 842 });
@@ -48,7 +48,7 @@ describe("Engine", () => {
   it("pide contraseña y la valida", () => {
     const engine = new Engine();
     const bytes = makePdf(["secreto"], "encrypt=aes-256,user-password=abc,owner-password=xyz");
-    expect(engine.open("a", bytes)).toEqual({ needsPassword: true });
+    expect(engine.open("a", bytes)).toEqual({ needsPassword: true, repaired: false });
     expect(engine.unlock("a", "mal")).toBe(false);
     expect(engine.unlock("a", "abc")).toBe(true);
     expect(engine.search("a", "secreto")).toHaveLength(1);
@@ -72,7 +72,7 @@ describe("Engine con PDF cifrado", () => {
     const engine = new Engine();
     engine.open("a", makePdf(["secreto"], "encrypt=aes-256,user-password=abc,owner-password=xyz"));
     engine.unlock("a", "abc");
-    expect(engine.open("b", engine.save("a"))).toEqual({ needsPassword: true });
+    expect(engine.open("b", engine.save("a"))).toEqual({ needsPassword: true, repaired: false });
   });
 });
 

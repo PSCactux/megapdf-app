@@ -229,5 +229,7 @@
   "Versión anterior": "Versió anterior",
   "Versión anterior:": "Versió anterior:",
   "Quitado en la versión actual": "Eliminat a la versió actual",
-  "Ahora: {text}": "Ara: {text}"
+  "Ahora: {text}": "Ara: {text}",
+  "«{name}» estaba dañado por un guardado anterior y se ha reparado al abrirlo. Guárdalo para conservar la reparación.": "«{name}» estava malmès per un desament anterior i s'ha reparat en obrir-lo. Desa'l per conservar la reparació.",
+  "No se ha guardado: el archivo resultante no se podía abrir bien. El documento abierto sigue igual; prueba con «Guardar como…».": "No s'ha desat: el fitxer resultant no es podia obrir bé. El document obert continua igual; prova «Desa com a…»."
 }

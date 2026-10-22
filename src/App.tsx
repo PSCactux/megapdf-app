@@ -200,13 +200,17 @@ export default function App() {
       }
       try {
         const id = crypto.randomUUID();
-        const { needsPassword } = await pdf.call("open", [id, await readFile(path)]);
+        const { needsPassword, repaired } = await pdf.call("open", [id, await readFile(path)]);
         remember(path);
         if (needsPassword) {
           setPasswordPrompt({ id, path, wrong: false });
           return null;
         }
         await addTab(id, path);
+        if (repaired) {
+          setDirty(id, true);
+          setNotice({ kind: "info", text: t("«{name}» estaba dañado por un guardado anterior y se ha reparado al abrirlo. Guárdalo para conservar la reparación.", { name: fileName(path) }) });
+        }
         return id;
       } catch (e) {
         showError(t("No se pudo abrir {name}: {error}", { name: fileName(path), error: message(e) }));
@@ -221,7 +225,7 @@ export default function App() {
         return null;
       }
     },
-    [addTab, remember, showError],
+    [addTab, remember, setDirty, showError],
   );
 
   const openDialog = useCallback(async () => {

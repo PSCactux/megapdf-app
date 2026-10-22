@@ -193,5 +193,7 @@
   "El libro no tiene ninguna hoja con datos": "El llibre no té cap full amb dades",
   "El libro no tiene datos que convertir": "El llibre no té dades per convertir",
   "Hoja": "Full",
-  "XML vacío o no válido": "XML buit o no vàlid"
+  "XML vacío o no válido": "XML buit o no vàlid",
+  "«{name}» estaba dañado por un guardado anterior y se ha reparado al abrirlo. Guárdalo para conservar la reparación.": "«{name}» estava malmès per un desament anterior i s'ha reparat en obrir-lo. Desa'l per conservar la reparació.",
+  "No se ha guardado: el archivo resultante no se podía abrir bien. El documento abierto sigue igual; prueba con «Guardar como…».": "No s'ha desat: el fitxer resultant no es podia obrir bé. El document obert continua igual; prova «Desa com a…»."
 }

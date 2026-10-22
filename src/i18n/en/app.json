@@ -229,5 +229,7 @@
   "Versión anterior": "Previous version",
   "Versión anterior:": "Previous version:",
   "Quitado en la versión actual": "Removed in the current version",
-  "Ahora: {text}": "Now: {text}"
+  "Ahora: {text}": "Now: {text}",
+  "«{name}» estaba dañado por un guardado anterior y se ha reparado al abrirlo. Guárdalo para conservar la reparación.": "“{name}” was damaged by an earlier save and has been repaired on opening. Save it to keep the repair.",
+  "No se ha guardado: el archivo resultante no se podía abrir bien. El documento abierto sigue igual; prueba con «Guardar como…».": "Not saved: the resulting file could not be opened correctly. The open document is unchanged; try “Save as…”."
 }
