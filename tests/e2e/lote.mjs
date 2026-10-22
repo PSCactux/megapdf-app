@@ -83,12 +83,15 @@ check(`otro.pdf recibe la página: ${await view().locator(".toolbar .muted").fir
 
 // --- Medir a escala ---
 await view().getByRole("button", { name: "Tamaño real" }).click();
+// Que la página termine de recolocarse con el zoom nuevo antes de medir sobre ella
+await wait(600);
 await view().getByRole("button", { name: "📏 Medir ▾" }).click();
 await page.getByRole("menuitem", { name: /Escala/ }).click();
 await page.getByRole("button", { name: "1:100", exact: true }).click();
 await page.getByRole("button", { name: "Usar esta escala" }).click();
 await view().getByRole("button", { name: "📏 Medir ▾" }).click();
 await page.getByRole("menuitem", { name: "↔ Distancia" }).click();
+await wait(200);
 // 100 pt = 3,53 cm en el papel = 3,53 m a 1:100
 await page.mouse.move(...(await app.at(100, 600)));
 await page.mouse.down();
