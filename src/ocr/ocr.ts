@@ -2,21 +2,22 @@ import { createWorker, OEM, type Worker } from "tesseract.js";
 import { pdf } from "../pdf/client";
 import type { RenderedPage } from "../pdf/engine";
 import { type OcrBlocks, type PageText, type Recognizer, type Turn, readPage } from "./words";
+import { t, tk } from "../i18n";
 
 /** Resolución a la que se renderiza cada página para reconocerla. */
 const OCR_DPI = 300;
 
 /** Idiomas incluidos en la app (sus datos están en public/ocr, ver scripts/ocr-assets.mjs). */
 export const OCR_LANGUAGES = [
-  ["spa", "Español"],
-  ["eng", "Inglés"],
-  ["cat", "Catalán"],
-  ["glg", "Gallego"],
-  ["eus", "Euskera"],
-  ["por", "Portugués"],
-  ["fra", "Francés"],
-  ["deu", "Alemán"],
-  ["ita", "Italiano"],
+  ["spa", tk("Español")],
+  ["eng", tk("Inglés")],
+  ["cat", tk("Catalán")],
+  ["glg", tk("Gallego")],
+  ["eus", tk("Euskera")],
+  ["por", tk("Portugués")],
+  ["fra", tk("Francés")],
+  ["deu", tk("Alemán")],
+  ["ita", tk("Italiano")],
 ] as const;
 
 /** Varios motores para leer páginas a la vez; cada uno ocupa memoria, así que como mucho tres. */
@@ -43,7 +44,7 @@ function ocrWorkers(languages: string[]): Promise<Worker[]> {
     ),
   ).catch((e) => {
     pool = null;
-    throw new Error(`No se pudo iniciar el OCR: ${e instanceof Error ? e.message : e}`);
+    throw new Error(t("No se pudo iniciar el OCR: {error}", { error: e instanceof Error ? e.message : String(e) }));
   });
   pool = { key, workers };
   return workers;

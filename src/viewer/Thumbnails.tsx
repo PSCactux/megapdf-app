@@ -3,6 +3,7 @@ import type { PageSize } from "../pdf/engine";
 import { clickSelection } from "../pdf/pages";
 import { dropIndexAt, outsideWindow } from "./dropTarget";
 import { PageCanvas } from "./PageCanvas";
+import { t } from "../i18n";
 
 const THUMB_WIDTH = 120;
 
@@ -65,7 +66,17 @@ export function Thumbnails(props: Props) {
     if (!toggle && !e.shiftKey) onSelect(i);
   }
 
-  const label = (ps: number[]) => (ps.length === 1 ? `Página ${ps[0] + 1}` : `${ps.length} páginas`);
+  /** Aviso mientras se arrastran páginas, según dónde se soltarían. */
+  function dragHint(d: Drag): string {
+    const one = d.pages.length === 1;
+    const params = { page: d.pages[0] + 1, n: d.pages.length };
+    if (d.target === "tab") return one ? t("Copiar página {page} a ese documento", params) : t("Copiar {n} páginas a ese documento", params);
+    if (d.target === "outside") return one ? t("Suelta para copiar página {page} en otra ventana", params) : t("Suelta para copiar {n} páginas en otra ventana", params);
+    if (d.target === "here") return one ? t("Mover página {page} aquí", params) : t("Mover {n} páginas aquí", params);
+    return one
+      ? t("Página {page}: suéltala en otra ventana, en la pestaña de otro documento o entre las miniaturas", params)
+      : t("{n} páginas: suéltala en otra ventana, en la pestaña de otro documento o entre las miniaturas", params);
+  }
   return (
     <div className="thumbs" ref={listRef}>
       {pages.map((size, i) => (
@@ -101,11 +112,11 @@ export function Thumbnails(props: Props) {
             // Tras arrastrar, el clic que llega a continuación no debe cambiar la selección
             dragged.current = true;
             setTimeout(() => (dragged.current = false), 0);
-            const t = targetAt(e.clientX, e.clientY);
+            const where = targetAt(e.clientX, e.clientY);
             const tab = tabUnder(e.clientX, e.clientY, docId);
-            if (t.target === "outside") props.onDropOutside(d.pages, e.screenX, e.screenY);
+            if (where.target === "outside") props.onDropOutside(d.pages, e.screenX, e.screenY);
             else if (tab) props.onDropOnTab(d.pages, tab);
-            else if (t.target === "here" && t.at !== null) props.onMove(d.pages, t.at);
+            else if (where.target === "here" && where.at !== null) props.onMove(d.pages, where.at);
           }}
           onPointerCancel={() => {
             press.current = null;
@@ -118,13 +129,7 @@ export function Thumbnails(props: Props) {
       ))}
       {drag && (
         <div className="drag-ghost" style={{ left: drag.x + 12, top: drag.y + 12 }}>
-          {drag.target === "tab"
-            ? `Copiar ${label(drag.pages).toLowerCase()} a ese documento`
-            : drag.target === "outside"
-              ? `Suelta para copiar ${label(drag.pages).toLowerCase()} en otra ventana`
-              : drag.target === "here"
-                ? `Mover ${label(drag.pages).toLowerCase()} aquí`
-                : `${label(drag.pages)}: suéltala en otra ventana, en la pestaña de otro documento o entre las miniaturas`}
+          {dragHint(drag)}
         </div>
       )}
     </div>

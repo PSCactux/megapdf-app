@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { parseRanges } from "../pdf/pages";
 import { fileName, pickInsertable } from "../files";
+import { t } from "../i18n";
 
 /** Rango legible a partir de índices: [0,1,2,4] → "1-3, 5". */
 export function describePages(pages: number[]): string {
@@ -34,7 +35,7 @@ export function InsertPagesDialog({ pageCount, current, onInsert, onCancel }: In
     <div className="modal-backdrop">
       <form
         className="modal modal-wide"
-        aria-label="Insertar páginas"
+        aria-label={t("Insertar páginas")}
         onSubmit={async (e) => {
           e.preventDefault();
           if (!ready) return;
@@ -46,67 +47,67 @@ export function InsertPagesDialog({ pageCount, current, onInsert, onCancel }: In
           }
         }}
       >
-        <h2>Insertar páginas</h2>
+        <h2>{t("Insertar páginas")}</h2>
         <label className="radio">
           <input type="radio" checked={kind === "files"} onChange={() => setKind("files")} />
-          Desde archivos (PDF o imágenes)
+          {t("Desde archivos (PDF o imágenes)")}
         </label>
         {kind === "files" && (
           <div className="props-row indent">
             <button type="button" onClick={async () => setPaths(await pickInsertable())}>
-              {paths.length ? "Cambiar…" : "Elegir archivos…"}
+              {paths.length ? t("Cambiar…") : t("Elegir archivos…")}
             </button>
             <span className="muted file-list-inline">{paths.map(fileName).join(", ")}</span>
           </div>
         )}
         <label className="radio">
           <input type="radio" checked={kind === "blank"} onChange={() => setKind("blank")} />
-          Páginas en blanco
+          {t("Páginas en blanco")}
         </label>
         {kind === "blank" && (
           <div className="props-row indent">
             <label className="prop">
-              Cuántas
+              {t("Cuántas")}
               <input type="number" min={1} max={100} value={count} onChange={(e) => setCount(Number(e.target.value))} className="num-input" />
             </label>
             <label className="prop">
-              Tamaño
+              {t("Tamaño")}
               <select value={size} onChange={(e) => setSize(e.target.value as typeof size)}>
-                <option value="same">Como la página de al lado</option>
+                <option value="same">{t("Como la página de al lado")}</option>
                 <option value="a4">A4</option>
-                <option value="letter">Carta</option>
+                <option value="letter">{t("Carta")}</option>
               </select>
             </label>
           </div>
         )}
         <fieldset className="where">
-          <legend>Dónde</legend>
+          <legend>{t("Dónde")}</legend>
           <label className="radio">
             <input type="radio" checked={where === "after"} onChange={() => setWhere("after")} />
-            Después de la página
-            <input value={where === "after" ? page : ""} onChange={(e) => setPage(e.target.value)} onFocus={() => setWhere("after")} className="num-input" aria-label="Después de la página" />
+            {t("Después de la página")}
+            <input value={where === "after" ? page : ""} onChange={(e) => setPage(e.target.value)} onFocus={() => setWhere("after")} className="num-input" aria-label={t("Después de la página")} />
           </label>
           <label className="radio">
             <input type="radio" checked={where === "before"} onChange={() => setWhere("before")} />
-            Antes de la página
-            <input value={where === "before" ? page : ""} onChange={(e) => setPage(e.target.value)} onFocus={() => setWhere("before")} className="num-input" aria-label="Antes de la página" />
+            {t("Antes de la página")}
+            <input value={where === "before" ? page : ""} onChange={(e) => setPage(e.target.value)} onFocus={() => setWhere("before")} className="num-input" aria-label={t("Antes de la página")} />
           </label>
           <label className="radio">
             <input type="radio" checked={where === "start"} onChange={() => setWhere("start")} />
-            Al principio
+            {t("Al principio")}
           </label>
           <label className="radio">
             <input type="radio" checked={where === "end"} onChange={() => setWhere("end")} />
-            Al final
+            {t("Al final")}
           </label>
         </fieldset>
-        {(where === "after" || where === "before") && !pageOk && <p className="error-text">La página debe estar entre 1 y {pageCount}.</p>}
+        {(where === "after" || where === "before") && !pageOk && <p className="error-text">{t("La página debe estar entre 1 y {n}.", { n: pageCount })}</p>}
         <div className="modal-actions">
           <button type="button" onClick={onCancel}>
-            Cancelar
+            {t("Cancelar")}
           </button>
           <button type="submit" className="primary" disabled={!ready || busy}>
-            {busy ? "Insertando…" : "Insertar"}
+            {busy ? t("Insertando…") : t("Insertar")}
           </button>
         </div>
       </form>
@@ -135,7 +136,7 @@ export function ExtractPagesDialog({ pageCount, initial, onExtract, onCancel }: 
     <div className="modal-backdrop">
       <form
         className="modal"
-        aria-label="Extraer páginas"
+        aria-label={t("Extraer páginas")}
         onSubmit={async (e) => {
           e.preventDefault();
           if (problem) return;
@@ -147,38 +148,38 @@ export function ExtractPagesDialog({ pageCount, initial, onExtract, onCancel }: 
           }
         }}
       >
-        <h2>Extraer páginas</h2>
+        <h2>{t("Extraer páginas")}</h2>
         <label className="prop">
-          Páginas (de 1 a {pageCount})
-          <input value={range} onChange={(e) => setRange(e.target.value)} placeholder="Ej.: 2-4, 7" aria-label="Páginas a extraer" autoFocus />
+          {t("Páginas (de 1 a {n})", { n: pageCount })}
+          <input value={range} onChange={(e) => setRange(e.target.value)} placeholder={t("Ej.: 2-4, 7")} aria-label={t("Páginas a extraer")} autoFocus />
         </label>
         {problem && range && <p className="error-text">{problem}</p>}
-        {!problem && <p className="hint">{pages.length === 1 ? "1 página" : `${pages.length} páginas`}</p>}
+        {!problem && <p className="hint">{pages.length === 1 ? t("1 página") : t("{n} páginas", { n: pages.length })}</p>}
         <label className="check">
           <input type="checkbox" checked={remove && !all} disabled={all} onChange={(e) => setRemove(e.target.checked)} />
-          Eliminarlas de este documento después de extraerlas
+          {t("Eliminarlas de este documento después de extraerlas")}
         </label>
         <label className="check">
           <input type="checkbox" checked={separate} onChange={(e) => setSeparate(e.target.checked)} />
-          Cada página en un archivo independiente
+          {t("Cada página en un archivo independiente")}
         </label>
         <fieldset className="where">
-          <legend>Resultado</legend>
+          <legend>{t("Resultado")}</legend>
           <label className="radio">
             <input type="radio" checked={destination === "tab"} onChange={() => setDestination("tab")} />
-            Abrir en {separate ? "pestañas nuevas" : "una pestaña nueva"}
+            {separate ? t("Abrir en pestañas nuevas") : t("Abrir en una pestaña nueva")}
           </label>
           <label className="radio">
             <input type="radio" checked={destination === "file"} onChange={() => setDestination("file")} />
-            {separate ? "Guardar en una carpeta…" : "Guardar como archivo…"}
+            {separate ? t("Guardar en una carpeta…") : t("Guardar como archivo…")}
           </label>
         </fieldset>
         <div className="modal-actions">
           <button type="button" onClick={onCancel}>
-            Cancelar
+            {t("Cancelar")}
           </button>
           <button type="submit" className="primary" disabled={!!problem || !pages.length || busy}>
-            {busy ? "Extrayendo…" : "Extraer"}
+            {busy ? t("Extrayendo…") : t("Extraer")}
           </button>
         </div>
       </form>

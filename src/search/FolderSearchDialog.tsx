@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { pdf } from "../pdf/client";
 import type { Snippet } from "../pdf/textSearch";
 import { fileName, pickFolder, readFile } from "../files";
+import { t } from "../i18n";
 
 type Props = {
   /** Abre el archivo en esa página y deja buscada la palabra. */
@@ -38,14 +39,14 @@ export function FolderSearchDialog({ onOpen, onClose }: Props) {
       return setError(e instanceof Error ? e.message : String(e));
     }
     const found: FileResult[] = [];
-    const issues: Problem[] = list.skipped.map((path) => ({ path, why: "no se pudo abrir la carpeta" }));
-    if (list.truncated) issues.push({ path: folder, why: `hay más de ${list.files.length} PDF: solo se ha buscado en los primeros` });
+    const issues: Problem[] = list.skipped.map((path) => ({ path, why: t("no se pudo abrir la carpeta") }));
+    if (list.truncated) issues.push({ path: folder, why: t("hay más de {n} PDF: solo se ha buscado en los primeros", { n: list.files.length }) });
     setProgress({ done: 0, total: list.files.length });
     for (const [k, path] of list.files.entries()) {
       if (cancelled.current) break;
       try {
         const r = await pdf.call("searchFile", [await readFile(path), query]);
-        if (r.locked) issues.push({ path, why: "tiene contraseña" });
+        if (r.locked) issues.push({ path, why: t("tiene contraseña") });
         else if (r.count) found.push({ path, count: r.count, hits: r.hits });
       } catch (e) {
         issues.push({ path, why: e instanceof Error ? e.message : String(e) });
@@ -63,23 +64,23 @@ export function FolderSearchDialog({ onOpen, onClose }: Props) {
     <div className="modal-backdrop">
       <form
         className="modal modal-wide folder-search"
-        aria-label="Buscar en una carpeta"
+        aria-label={t("Buscar en una carpeta")}
         onSubmit={(e) => {
           e.preventDefault();
           search();
         }}
       >
-        <h2>Buscar en una carpeta</h2>
+        <h2>{t("Buscar en una carpeta")}</h2>
         <div className="props-row">
           <label className="prop" style={{ flex: 2 }}>
-            Texto
-            <input id="folder-query" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ej.: B12345678 o cláusula de rescisión" autoFocus />
+            {t("Texto")}
+            <input id="folder-query" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("Ej.: B12345678 o cláusula de rescisión")} autoFocus />
           </label>
           <div className="prop" style={{ flex: 3 }}>
-            Carpeta
+            {t("Carpeta")}
             <div className="props-row">
               <button type="button" onClick={async () => setFolder((await pickFolder()) ?? folder)}>
-                {folder ? "Cambiar…" : "Elegir carpeta…"}
+                {folder ? t("Cambiar…") : t("Elegir carpeta…")}
               </button>
               {folder && (
                 <span className="muted folder-path" title={folder}>
@@ -91,22 +92,26 @@ export function FolderSearchDialog({ onOpen, onClose }: Props) {
         </div>
         <label className="check">
           <input type="checkbox" checked={recursive} onChange={(e) => setRecursive(e.target.checked)} disabled={searching} />
-          Incluir las subcarpetas
+          {t("Incluir las subcarpetas")}
         </label>
         {progress && (
           <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.done}>
             <div style={{ width: `${(100 * progress.done) / Math.max(1, progress.total)}%` }} />
             <span>
-              {progress.done} de {progress.total} archivos…
+              {t("{done} de {total} archivos…", { done: progress.done, total: progress.total })}
             </span>
           </div>
         )}
         {error && <p className="error-text">{error}</p>}
         {results && !searching && (
           <p className="muted">
-            {results.length
-              ? `${total} ${total === 1 ? "resultado" : "resultados"} en ${results.length} ${results.length === 1 ? "archivo" : "archivos"}.`
-              : "No aparece en ningún PDF de la carpeta."}
+            {!results.length
+              ? t("No aparece en ningún PDF de la carpeta.")
+              : results.length > 1
+                ? t("{total} resultados en {files} archivos.", { total, files: results.length })
+                : total === 1
+                  ? t("{total} resultado en {files} archivo.", { total, files: results.length })
+                  : t("{total} resultados en {files} archivo.", { total, files: results.length })}
           </p>
         )}
         {results && results.length > 0 && (
@@ -116,12 +121,12 @@ export function FolderSearchDialog({ onOpen, onClose }: Props) {
                 <div className="folder-file">
                   <strong>{fileName(r.path)}</strong>
                   <span className="muted">
-                    {r.count} {r.count === 1 ? "vez" : "veces"}
+                    {r.count === 1 ? t("{n} vez", { n: r.count }) : t("{n} veces", { n: r.count })}
                   </span>
                 </div>
                 {r.hits.map((h, k) => (
                   <button key={k} type="button" className="folder-hit" onClick={() => onOpen(r.path, h.page, query)}>
-                    <span className="muted">p. {h.page + 1}</span>
+                    <span className="muted">{t("p. {page}", { page: h.page + 1 })}</span>
                     <span>
                       {h.snippet.before}
                       <mark>{h.snippet.match}</mark>
@@ -129,7 +134,7 @@ export function FolderSearchDialog({ onOpen, onClose }: Props) {
                     </span>
                   </button>
                 ))}
-                {r.count > r.hits.length && <span className="muted">y {r.count - r.hits.length} más dentro del archivo</span>}
+                {r.count > r.hits.length && <span className="muted">{t("y {n} más dentro del archivo", { n: r.count - r.hits.length })}</span>}
               </li>
             ))}
           </ul>
@@ -137,7 +142,7 @@ export function FolderSearchDialog({ onOpen, onClose }: Props) {
         {problems.length > 0 && (
           <details className="folder-problems">
             <summary>
-              {problems.length} {problems.length === 1 ? "archivo no se pudo mirar" : "archivos no se pudieron mirar"}
+              {problems.length === 1 ? t("{n} archivo no se pudo mirar", { n: problems.length }) : t("{n} archivos no se pudieron mirar", { n: problems.length })}
             </summary>
             <ul>
               {problems.map((p) => (
@@ -151,15 +156,15 @@ export function FolderSearchDialog({ onOpen, onClose }: Props) {
         <div className="modal-actions">
           {searching ? (
             <button type="button" onClick={() => (cancelled.current = true)}>
-              Parar
+              {t("Parar")}
             </button>
           ) : (
             <button type="button" onClick={onClose}>
-              Cerrar
+              {t("Cerrar")}
             </button>
           )}
           <button type="submit" className="primary" disabled={searching || !folder || !query.trim()}>
-            Buscar
+            {t("Buscar")}
           </button>
         </div>
       </form>

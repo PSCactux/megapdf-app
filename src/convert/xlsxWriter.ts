@@ -1,5 +1,6 @@
 import { strToU8, zipSync } from "fflate";
 import { escapeHtml as esc } from "./xml";
+import { t } from "../i18n";
 
 /** Celda: un número se guarda como número; un texto, tal cual (sin convertir «001234» en 1234). */
 export type Cell = string | number | null;
@@ -53,7 +54,7 @@ function sheetXml({ rows, widths }: Sheet): string {
 function uniqueNames(names: string[]): string[] {
   const used = new Set<string>();
   return names.map((n) => {
-    const base = (n.replace(/[[\]:*?/\\]/g, " ").trim() || "Hoja").slice(0, 31);
+    const base = (n.replace(/[[\]:*?/\\]/g, " ").trim() || t("Hoja")).slice(0, 31);
     let name = base;
     for (let k = 2; used.has(name.toLowerCase()); k++) name = `${base.slice(0, 31 - String(k).length - 1)} ${k}`;
     used.add(name.toLowerCase());

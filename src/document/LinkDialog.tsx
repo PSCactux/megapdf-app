@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { LinkTarget } from "../pdf/document";
 import { normalizeUrl } from "../pdf/url";
+import { t } from "../i18n";
 
 type Props = {
   pageCount: number;
@@ -17,7 +18,7 @@ export function LinkDialog({ pageCount, initial, onSave, onCancel }: Props) {
   const [url, setUrl] = useState(initial && "url" in initial ? initial.url.replace(/^mailto:/, "") : "");
   const n = Number(page);
   let problem: string | null = null;
-  if (kind === "page" && (!Number.isInteger(n) || n < 1 || n > pageCount)) problem = `Escribe un número de página entre 1 y ${pageCount}.`;
+  if (kind === "page" && (!Number.isInteger(n) || n < 1 || n > pageCount)) problem = t("Escribe un número de página entre 1 y {count}.", { count: pageCount });
   if (kind === "url") {
     try {
       normalizeUrl(url);
@@ -30,38 +31,38 @@ export function LinkDialog({ pageCount, initial, onSave, onCancel }: Props) {
     <div className="modal-backdrop">
       <form
         className="modal"
-        aria-label="Enlace"
+        aria-label={t("Enlace")}
         onSubmit={(e) => {
           e.preventDefault();
           if (ready) onSave(kind === "page" ? { page: n - 1 } : { url: normalizeUrl(url) });
         }}
       >
-        <h2>{initial ? "Cambiar enlace" : "Nuevo enlace"}</h2>
+        <h2>{initial ? t("Cambiar enlace") : t("Nuevo enlace")}</h2>
         <label className="radio">
           <input type="radio" checked={kind === "page"} onChange={() => setKind("page")} />
-          Ir a la página
+          {t("Ir a la página")}
           <input
             className="indent"
             type="number"
             min={1}
             max={pageCount}
             value={page}
-            aria-label="Página de destino"
+            aria-label={t("Página de destino")}
             onFocus={() => setKind("page")}
             onChange={(e) => setPage(e.target.value)}
             style={{ width: 80 }}
           />
-          <span className="muted">de {pageCount}</span>
+          <span className="muted">{t("de {count}", { count: pageCount })}</span>
         </label>
         <label className="radio">
           <input type="radio" checked={kind === "url"} onChange={() => setKind("url")} />
-          Abrir una web o escribir un correo
+          {t("Abrir una web o escribir un correo")}
         </label>
         <input
           className="indent"
           value={url}
-          aria-label="Dirección web o correo"
-          placeholder="www.ejemplo.com o nombre@ejemplo.com"
+          aria-label={t("Dirección web o correo")}
+          placeholder={t("www.ejemplo.com o nombre@ejemplo.com")}
           onFocus={() => setKind("url")}
           onChange={(e) => setUrl(e.target.value)}
           autoFocus={kind === "url"}
@@ -69,10 +70,10 @@ export function LinkDialog({ pageCount, initial, onSave, onCancel }: Props) {
         {problem && <p className="error-text">{problem}</p>}
         <div className="modal-actions">
           <button type="button" onClick={onCancel}>
-            Cancelar
+            {t("Cancelar")}
           </button>
           <button type="submit" className="primary" disabled={!ready}>
-            {initial ? "Guardar" : "Crear enlace"}
+            {initial ? t("Guardar") : t("Crear enlace")}
           </button>
         </div>
       </form>

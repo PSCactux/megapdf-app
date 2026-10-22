@@ -3,6 +3,7 @@ import { css } from "./geometry";
 import { PALETTE } from "./tools";
 import { type StampChoice, allStamps, imageStamp, loadCustomStamps, saveCustomStamps } from "./customStamps";
 import { fileName, pickImages, readFile } from "../files";
+import { t } from "../i18n";
 
 type Props = { onClose: (list: StampChoice[]) => void; onError: (message: string) => void };
 
@@ -29,15 +30,15 @@ export function StampsDialog({ onClose, onError }: Props) {
     try {
       update([...list, await imageStamp(fileName(path).replace(/\.[^.]+$/, ""), await readFile(path))]);
     } catch (e) {
-      onError(`No se pudo usar la imagen: ${e instanceof Error ? e.message : e}`);
+      onError(t("No se pudo usar la imagen: {error}", { error: e instanceof Error ? e.message : String(e) }));
     }
   }
 
   return (
     <div className="modal-backdrop">
-      <div className="modal" role="dialog" aria-label="Sellos propios">
-        <h2>Sellos propios</h2>
-        <p className="hint">Los sellos de texto llevan debajo, solos, quién los pone y cuándo. Se guardan en este equipo.</p>
+      <div className="modal" role="dialog" aria-label={t("Sellos propios")}>
+        <h2>{t("Sellos propios")}</h2>
+        <p className="hint">{t("Los sellos de texto llevan debajo, solos, quién los pone y cuándo. Se guardan en este equipo.")}</p>
         <form
           className="props-row"
           onSubmit={(e) => {
@@ -47,19 +48,19 @@ export function StampsDialog({ onClose, onError }: Props) {
             setLabel("");
           }}
         >
-          <input id="stamp-label" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ej.: REGISTRO DE ENTRADA" aria-label="Texto del sello" style={{ flex: 1 }} />
+          <input id="stamp-label" value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t("Ej.: REGISTRO DE ENTRADA")} aria-label={t("Texto del sello")} style={{ flex: 1 }} />
           {PALETTE.map((c) => (
-            <button type="button" key={c.name} className={`swatch-btn ${c.rgb === color ? "is-on" : ""}`} title={c.name} onClick={() => setColor(c.rgb)}>
+            <button type="button" key={c.name} className={`swatch-btn ${c.rgb === color ? "is-on" : ""}`} title={t(c.name)} onClick={() => setColor(c.rgb)}>
               <span className="swatch" style={{ background: css(c.rgb) }} />
             </button>
           ))}
           <button type="submit" disabled={!text || exists}>
-            Añadir
+            {t("Añadir")}
           </button>
         </form>
-        {exists && <p className="error-text">Ya hay un sello «{text}».</p>}
+        {exists && <p className="error-text">{t("Ya hay un sello «{text}».", { text })}</p>}
         <button type="button" onClick={addImage}>
-          Añadir un sello de imagen…
+          {t("Añadir un sello de imagen…")}
         </button>
         {list.length > 0 ? (
           <ul className="stamp-list">
@@ -76,17 +77,17 @@ export function StampsDialog({ onClose, onError }: Props) {
                   </span>
                 )}
                 <button className="danger" onClick={() => update(list.filter((_, k) => k !== i))}>
-                  Quitar
+                  {t("Quitar")}
                 </button>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="muted">Aún no hay sellos propios.</p>
+          <p className="muted">{t("Aún no hay sellos propios.")}</p>
         )}
         <div className="modal-actions">
           <button className="primary" onClick={() => onClose(list)}>
-            Hecho
+            {t("Hecho")}
           </button>
         </div>
       </div>

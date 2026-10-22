@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import type { OutlineNode } from "../pdf/engine";
+import { t } from "../i18n";
 
 type Props = {
   items: OutlineNode[];
@@ -27,18 +28,18 @@ export function Outline(props: Props) {
   return (
     <div className="outline-panel">
       <div className="outline-head">
-        <span>Marcadores</span>
+        <span>{t("Marcadores")}</span>
         <span className="outline-actions">
-          <button onClick={props.onFromHeadings} disabled={!editable} title="Crear marcadores a partir de los títulos del documento">
-            Desde títulos…
+          <button onClick={props.onFromHeadings} disabled={!editable} title={t("Crear marcadores a partir de los títulos del documento")}>
+            {t("Desde títulos…")}
           </button>
-          <button onClick={props.onAdd} disabled={!editable} title="Añadir un marcador a la página actual (⌘B)">
-            ＋ Añadir
+          <button onClick={props.onAdd} disabled={!editable} title={t("Añadir un marcador a la página actual (⌘B)")}>
+            {t("＋ Añadir")}
           </button>
         </span>
       </div>
       {items.length === 0 ? (
-        <p className="sidebar-empty">Este documento no tiene marcadores. Pulsa «Añadir» para marcar la página actual.</p>
+        <p className="sidebar-empty">{t("Este documento no tiene marcadores. Pulsa «Añadir» para marcar la página actual.")}</p>
       ) : (
         <OutlineList {...props} path={[]} onMenu={editable ? setMenu : null} />
       )}
@@ -54,16 +55,16 @@ export function Outline(props: Props) {
               onClick={() => setMenu(null)}
             >
               <button role="menuitem" onClick={() => props.onRenaming(menu.path.join("."))}>
-                Cambiar nombre
+                {t("Cambiar nombre")}
               </button>
               <button role="menuitem" disabled={menu.path[menu.path.length - 1] === 0} onClick={() => props.onMove(menu.path, -1)}>
-                Subir
+                {t("Subir")}
               </button>
               <button role="menuitem" disabled={menu.path[menu.path.length - 1] === menu.siblings - 1} onClick={() => props.onMove(menu.path, 1)}>
-                Bajar
+                {t("Bajar")}
               </button>
               <button role="menuitem" onClick={() => props.onDelete(menu.path)}>
-                Eliminar
+                {t("Eliminar")}
               </button>
             </div>
           </div>,
@@ -110,7 +111,7 @@ function OutlineLink(props: ListProps & { item: OutlineNode; siblings: number })
     return (
       <input
         className="outline-rename"
-        aria-label="Nombre del marcador"
+        aria-label={t("Nombre del marcador")}
         defaultValue={item.title}
         autoFocus
         onFocus={(e) => e.currentTarget.select()}
@@ -127,7 +128,7 @@ function OutlineLink(props: ListProps & { item: OutlineNode; siblings: number })
     <button
       className="outline-link"
       disabled={item.page === null && !editable}
-      title={editable ? "Doble clic para cambiar el nombre; clic derecho para más opciones" : undefined}
+      title={editable ? t("Doble clic para cambiar el nombre; clic derecho para más opciones") : undefined}
       onClick={() => item.page !== null && props.onSelect(item.page)}
       onDoubleClick={() => editable && props.onRenaming(key)}
       onContextMenu={(e) => {
@@ -144,7 +145,7 @@ function OutlineLink(props: ListProps & { item: OutlineNode; siblings: number })
         e.stopPropagation();
       }}
     >
-      {item.title || "(sin título)"}
+      {item.title || t("(sin título)")}
     </button>
   );
 }

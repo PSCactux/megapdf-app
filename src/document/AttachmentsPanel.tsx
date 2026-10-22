@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { pdf } from "../pdf/client";
 import type { Attachment } from "../pdf/document";
+import { locale, t } from "../i18n";
 
 type Props = {
   docId: string;
@@ -13,7 +14,7 @@ type Props = {
   onError: (message: string) => void;
 };
 
-const size = (bytes: number | null) => (bytes === null ? "" : bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} MB`);
+const size = (bytes: number | null) => (bytes === null ? "" : bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB`);
 
 /** Archivos adjuntos al documento o a sus páginas. */
 export function AttachmentsPanel({ docId, revision, editable, onAdd, onOpen, onSave, onRemove, onError }: Props) {
@@ -22,7 +23,7 @@ export function AttachmentsPanel({ docId, revision, editable, onAdd, onOpen, onS
     let stale = false;
     pdf.call("attachments", [docId]).then(
       (a) => !stale && setItems(a),
-      (e) => onError(`No se pudieron leer los adjuntos: ${e instanceof Error ? e.message : e}`),
+      (e) => onError(t("No se pudieron leer los adjuntos: {error}", { error: e instanceof Error ? e.message : String(e) })),
     );
     return () => {
       stale = true;
@@ -31,23 +32,23 @@ export function AttachmentsPanel({ docId, revision, editable, onAdd, onOpen, onS
   return (
     <div className="outline-panel">
       <div className="outline-head">
-        <span>Adjuntos</span>
-        <button onClick={onAdd} disabled={!editable} title="Adjuntar archivos al documento">
-          ＋ Añadir
+        <span>{t("Adjuntos")}</span>
+        <button onClick={onAdd} disabled={!editable} title={t("Adjuntar archivos al documento")}>
+          ＋ {t("Añadir")}
         </button>
       </div>
-      {items && items.length === 0 && <p className="sidebar-empty">Este documento no tiene archivos adjuntos.</p>}
+      {items && items.length === 0 && <p className="sidebar-empty">{t("Este documento no tiene archivos adjuntos.")}</p>}
       <ul className="attachments">
         {items?.map((a) => (
           <li key={a.key}>
             <strong title={a.name}>{a.name}</strong>
-            <span className="muted">{[size(a.size), a.page !== null ? `en la página ${a.page + 1}` : null].filter(Boolean).join(" · ")}</span>
+            <span className="muted">{[size(a.size), a.page !== null ? t("en la página {n}", { n: a.page + 1 }) : null].filter(Boolean).join(" · ")}</span>
             {a.description && <span className="muted">{a.description}</span>}
             <div className="attachment-actions">
-              {/\.pdf$/i.test(a.name) && <button onClick={() => onOpen(a)}>Abrir</button>}
-              <button onClick={() => onSave(a)}>Guardar…</button>
+              {/\.pdf$/i.test(a.name) && <button onClick={() => onOpen(a)}>{t("Abrir")}</button>}
+              <button onClick={() => onSave(a)}>{t("Guardar…")}</button>
               <button className="danger" disabled={!editable} onClick={() => onRemove(a)}>
-                Quitar
+                {t("Quitar")}
               </button>
             </div>
           </li>

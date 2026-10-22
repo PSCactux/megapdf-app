@@ -1,9 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { message, open, save } from "@tauri-apps/plugin-dialog";
+import { t, tk } from "./i18n";
 
 const PDF_FILTER = [{ name: "PDF", extensions: ["pdf"] }];
 // Formatos de imagen que MuPDF sabe leer
-const IMAGE_FILTER = [{ name: "Imágenes", extensions: ["png", "jpg", "jpeg", "gif", "bmp", "tif", "tiff"] }];
+const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "bmp", "tif", "tiff"];
 
 export async function pickPdfs(): Promise<string[]> {
   const picked = await open({ multiple: true, filters: PDF_FILTER });
@@ -12,17 +13,17 @@ export async function pickPdfs(): Promise<string[]> {
 
 /** PDF o imágenes para insertar páginas. */
 export async function pickInsertable(): Promise<string[]> {
-  const picked = await open({ multiple: true, filters: [{ name: "PDF e imágenes", extensions: ["pdf", ...IMAGE_FILTER[0].extensions] }] });
+  const picked = await open({ multiple: true, filters: [{ name: t("PDF e imágenes"), extensions: ["pdf", ...IMAGE_EXTENSIONS] }] });
   return picked ?? [];
 }
 
 export async function pickImages(): Promise<string[]> {
-  const picked = await open({ multiple: true, filters: IMAGE_FILTER });
+  const picked = await open({ multiple: true, filters: [{ name: t("Imágenes"), extensions: IMAGE_EXTENSIONS }] });
   return picked ?? [];
 }
 
 export async function pickCertificate(): Promise<string | null> {
-  return open({ multiple: false, filters: [{ name: "Certificado digital", extensions: ["p12", "pfx"] }] });
+  return open({ multiple: false, filters: [{ name: t("Certificado digital"), extensions: ["p12", "pfx"] }] });
 }
 
 /** Cualquier archivo (para adjuntarlo a un PDF). */
@@ -40,21 +41,22 @@ export async function pickSavePath(defaultPath: string): Promise<string | null> 
   const name = fileName(defaultPath);
   const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
   // Un adjunto puede ser de cualquier tipo: se filtra por su propia extensión
-  return save({ defaultPath, filters: SAVE_FILTERS[ext] ?? (ext ? [{ name: ext.toUpperCase(), extensions: [ext] }] : []) });
+  const filters = SAVE_FILTERS[ext]?.map((f) => ({ ...f, name: t(f.name) })) ?? (ext ? [{ name: ext.toUpperCase(), extensions: [ext] }] : []);
+  return save({ defaultPath, filters });
 }
 
 const SAVE_FILTERS: Record<string, { name: string; extensions: string[] }[]> = {
   pdf: PDF_FILTER,
-  docx: [{ name: "Documento de Word", extensions: ["docx"] }],
-  xlsx: [{ name: "Libro de Excel", extensions: ["xlsx"] }],
-  txt: [{ name: "Texto", extensions: ["txt"] }],
+  docx: [{ name: tk("Documento de Word"), extensions: ["docx"] }],
+  xlsx: [{ name: tk("Libro de Excel"), extensions: ["xlsx"] }],
+  txt: [{ name: tk("Texto"), extensions: ["txt"] }],
 };
 
 /** Documentos que se pueden convertir a PDF (con el conversor propio o con Office). */
 export const CONVERTIBLE = ["docx", "xlsx", "txt", "doc", "rtf", "odt", "xls", "ods", "csv", "pptx", "ppt", "odp", "png", "jpg", "jpeg", "gif", "bmp", "tif", "tiff"];
 
 export async function pickConvertible(): Promise<string[]> {
-  const picked = await open({ multiple: true, filters: [{ name: "Documentos e imágenes", extensions: CONVERTIBLE }] });
+  const picked = await open({ multiple: true, filters: [{ name: t("Documentos e imágenes"), extensions: CONVERTIBLE }] });
   return picked ?? [];
 }
 
@@ -78,5 +80,5 @@ export const joinPath = (dir: string, name: string) => `${dir}${dir.includes("\\
 
 /** Pregunta nativa con botón de confirmar y Cancelar. */
 export async function confirmAction(text: string, okLabel: string): Promise<boolean> {
-  return (await message(text, { kind: "warning", buttons: { ok: okLabel, cancel: "Cancelar" } })) === okLabel;
+  return (await message(text, { kind: "warning", buttons: { ok: okLabel, cancel: t("Cancelar") } })) === okLabel;
 }

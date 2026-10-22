@@ -1,4 +1,5 @@
 import forge from "node-forge";
+import { locale, t } from "../i18n";
 
 /**
  * Firma digital PAdES básica (adbe.pkcs7.detached) con certificados .p12/.pfx.
@@ -49,17 +50,17 @@ export function loadIdentity(p12: Uint8Array, password: string): Identity {
   try {
     parsed = forge.pkcs12.pkcs12FromAsn1(forge.asn1.fromDer(toBinary(p12)), password);
   } catch {
-    throw new Error("No se pudo abrir el certificado: la contraseña es incorrecta o el archivo no es un .p12/.pfx válido");
+    throw new Error(t("No se pudo abrir el certificado: la contraseña es incorrecta o el archivo no es un .p12/.pfx válido"));
   }
   const keyBag =
     parsed.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0] ??
     parsed.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag]?.[0];
   const certs = (parsed.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] ?? []).map((b) => b.cert).filter((c): c is forge.pki.Certificate => !!c);
-  if (!keyBag?.key) throw new Error("El certificado no contiene clave privada (o usa claves de curva elíptica, que aún no se admiten)");
+  if (!keyBag?.key) throw new Error(t("El certificado no contiene clave privada (o usa claves de curva elíptica, que aún no se admiten)"));
   const key = keyBag.key as forge.pki.rsa.PrivateKey;
   // El certificado del firmante es el que corresponde a la clave privada
   const cert = certs.find((c) => (c.publicKey as forge.pki.rsa.PublicKey).n.equals(key.n));
-  if (!cert) throw new Error("El archivo no contiene el certificado de la clave privada");
+  if (!cert) throw new Error(t("El archivo no contiene el certificado de la clave privada"));
   return {
     key,
     cert,
@@ -77,20 +78,20 @@ export function applySignature(pdf: Uint8Array, identity: Identity, signingTime:
   const text = latin1(out);
   const contentsHex = `<${"0".repeat(SIG_BYTES * 2)}>`;
   const start = text.lastIndexOf(contentsHex);
-  if (start < 0) throw new Error("El documento no tiene el hueco reservado para la firma");
+  if (start < 0) throw new Error(t("El documento no tiene el hueco reservado para la firma"));
   const end = start + contentsHex.length;
 
   const placeholder = new RegExp(`\\[\\s*${BYTE_RANGE_PLACEHOLDER.join("\\s+")}\\s*\\]`, "g");
   const matches = [...text.matchAll(placeholder)];
   const match = matches[matches.length - 1];
-  if (!match) throw new Error("El documento no tiene el /ByteRange provisional");
+  if (!match) throw new Error(t("El documento no tiene el /ByteRange provisional"));
   const byteRange = [0, start, end, out.length - end];
   const value = `[${byteRange.join(" ")}]`;
-  if (value.length > match[0].length) throw new Error("El /ByteRange no cabe en el espacio reservado");
+  if (value.length > match[0].length) throw new Error(t("El /ByteRange no cabe en el espacio reservado"));
   writeAscii(out, match.index!, value.padEnd(match[0].length, " "));
 
   if (now(signingTime) > identity.validTo.getTime() || now(signingTime) < identity.validFrom.getTime()) {
-    throw new Error(`El certificado no está vigente (válido del ${fmt(identity.validFrom)} al ${fmt(identity.validTo)})`);
+    throw new Error(t("El certificado no está vigente (válido del {desde} al {hasta})", { desde: fmt(identity.validFrom), hasta: fmt(identity.validTo) }));
   }
 
   const p7 = forge.pkcs7.createSignedData();
@@ -110,7 +111,7 @@ export function applySignature(pdf: Uint8Array, identity: Identity, signingTime:
   p7.sign({ detached: true });
   const der = forge.asn1.toDer(p7.toAsn1()).getBytes();
   const hex = forge.util.bytesToHex(der);
-  if (hex.length > SIG_BYTES * 2) throw new Error("La firma es más grande que el espacio reservado");
+  if (hex.length > SIG_BYTES * 2) throw new Error(t("La firma es más grande que el espacio reservado"));
   writeAscii(out, start + 1, hex.padEnd(SIG_BYTES * 2, "0"));
   return out;
 }
@@ -121,23 +122,23 @@ export function verifySignature(pdf: Uint8Array, byteRange: number[], contents: 
   const [a, b, c, d] = byteRange;
   base.coversWholeDocument = a === 0 && c + d === pdf.length;
   try {
-    if (byteRange.length !== 4 || b > pdf.length || c + d > pdf.length) throw new Error("El /ByteRange no corresponde a este archivo");
+    if (byteRange.length !== 4 || b > pdf.length || c + d > pdf.length) throw new Error(t("El /ByteRange no corresponde a este archivo"));
     const msg = forge.pkcs7.messageFromAsn1(fromDerLenient(toBinary(contents))) as forge.pkcs7.PkcsSignedData & {
       rawCapture: { signerInfos: forge.asn1.Asn1[] };
     };
     const info = msg.rawCapture.signerInfos[0];
-    if (!info) throw new Error("La firma no contiene firmante");
+    if (!info) throw new Error(t("La firma no contiene firmante"));
     const fields = info.value as forge.asn1.Asn1[];
     const serial = forge.util.bytesToHex(((fields[1].value as forge.asn1.Asn1[])[1].value as string) ?? "");
     const cert = msg.certificates.find((x) => x.serialNumber.replace(/^0+/, "") === serial.replace(/^0+/, "")) ?? msg.certificates[0];
-    if (!cert) throw new Error("La firma no incluye el certificado del firmante");
+    if (!cert) throw new Error(t("La firma no incluye el certificado del firmante"));
     base.signer = commonName(cert.subject);
     base.issuer = commonName(cert.issuer);
 
     const digestOid = forge.asn1.derToOid((fields[2].value as forge.asn1.Asn1[])[0].value as string);
     const auth = fields.find((f) => f.tagClass === forge.asn1.Class.CONTEXT_SPECIFIC && f.type === 0);
     const sigValue = fields.find((f, i) => i > 3 && f.type === forge.asn1.Type.OCTETSTRING);
-    if (!auth || !sigValue) throw new Error("Firma sin atributos firmados (formato no admitido)");
+    if (!auth || !sigValue) throw new Error(t("Firma sin atributos firmados (formato no admitido)"));
 
     const attrs = new Map<string, forge.asn1.Asn1>();
     for (const attr of auth.value as forge.asn1.Asn1[]) {
@@ -161,10 +162,10 @@ export function verifySignature(pdf: Uint8Array, byteRange: number[], contents: 
     base.intact = contentMatches && signatureOk;
     const at = base.signedAt?.getTime() ?? Date.now();
     base.certValidAtSigning = at >= cert.validity.notBefore.getTime() && at <= cert.validity.notAfter.getTime();
-    if (!contentMatches) base.problem = "El contenido firmado ha sido alterado";
-    else if (!signatureOk) base.problem = "La firma criptográfica no es válida";
-    else if (!base.certValidAtSigning) base.problem = "El certificado no estaba vigente al firmar";
-    else if (!base.coversWholeDocument) base.problem = "Se han guardado cambios después de firmar";
+    if (!contentMatches) base.problem = t("El contenido firmado ha sido alterado");
+    else if (!signatureOk) base.problem = t("La firma criptográfica no es válida");
+    else if (!base.certValidAtSigning) base.problem = t("El certificado no estaba vigente al firmar");
+    else if (!base.coversWholeDocument) base.problem = t("Se han guardado cambios después de firmar");
   } catch (e) {
     base.problem = e instanceof Error ? e.message : String(e);
   }
@@ -180,15 +181,15 @@ function digest(oid: string): forge.md.MessageDigest {
   if (name === "sha384") return forge.md.sha384.create();
   if (name === "sha512") return forge.md.sha512.create();
   if (name === "sha1") return forge.md.sha1.create();
-  throw new Error(`Algoritmo de resumen no admitido: ${name ?? oid}`);
+  throw new Error(t("Algoritmo de resumen no admitido: {algoritmo}", { algoritmo: name ?? oid }));
 }
 
 function commonName(dn: forge.pki.Certificate["subject"]): string {
-  return (dn.getField("CN")?.value as string | undefined) ?? (dn.getField("O")?.value as string | undefined) ?? "(sin nombre)";
+  return (dn.getField("CN")?.value as string | undefined) ?? (dn.getField("O")?.value as string | undefined) ?? t("(sin nombre)");
 }
 
 const now = (d: Date) => d.getTime();
-const fmt = (d: Date) => d.toLocaleDateString("es-ES");
+const fmt = (d: Date) => d.toLocaleDateString(locale());
 
 /** Uint8Array → cadena binaria de forge, por trozos para no desbordar la pila. */
 function toBinary(bytes: Uint8Array): string {

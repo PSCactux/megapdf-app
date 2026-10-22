@@ -7,6 +7,7 @@ import { LazyPage, tabUnder } from "../viewer/Thumbnails";
 import { outsideWindow } from "../viewer/dropTarget";
 import { SplitDialog } from "./SplitDialog";
 import { usePdfPassword } from "./usePdfPassword";
+import { t } from "../i18n";
 
 type Props = {
   docId: string;
@@ -32,6 +33,7 @@ type Press = { index: number; x: number; y: number; pages: number[]; collapseOnC
 type Drag = { pages: number[]; x: number; y: number; drop: number | null; tab: string | null };
 
 const DRAG_THRESHOLD = 5;
+const dragLabel = (pages: number[]) => (pages.length === 1 ? t("Página {n}", { n: pages[0] + 1 }) : t("{n} páginas", { n: pages.length }));
 const A4 = { width: 595, height: 842 };
 
 export function OrganizeView({ docId, info, doc, baseName, selection, anchor, onSelection, onOpenPage, onExtract, onDuplicate, onDropOnTab, onDropOutside, onError }: Props) {
@@ -123,38 +125,38 @@ export function OrganizeView({ docId, info, doc, baseName, selection, anchor, on
   }
 
   const has = selection.length > 0;
-  const label = !has ? "Ninguna página seleccionada" : selection.length === 1 ? `Página ${selection[0] + 1} seleccionada` : `${selection.length} páginas seleccionadas`;
+  const label = !has ? t("Ninguna página seleccionada") : selection.length === 1 ? t("Página {n} seleccionada", { n: selection[0] + 1 }) : t("{n} páginas seleccionadas", { n: selection.length });
 
   return (
     <div className="organize">
       <div className="toolbar organize-toolbar">
         <div className="group">
-          <button disabled={!has} onClick={() => doc.rotate(selection, -90)} title="Girar a la izquierda">
-            ↺ Girar
+          <button disabled={!has} onClick={() => doc.rotate(selection, -90)} title={t("Girar a la izquierda")}>
+            {t("↺ Girar")}
           </button>
-          <button disabled={!has} onClick={() => doc.rotate(selection, 90)} title="Girar a la derecha">
-            ↻ Girar
+          <button disabled={!has} onClick={() => doc.rotate(selection, 90)} title={t("Girar a la derecha")}>
+            {t("↻ Girar")}
           </button>
-          <button disabled={!has} onClick={() => remove(selection)} className="danger" title="Eliminar (⌫)">
-            Eliminar
+          <button disabled={!has} onClick={() => remove(selection)} className="danger" title={t("Eliminar (⌫)")}>
+            {t("Eliminar")}
           </button>
-          <button disabled={!has} onClick={() => onDuplicate(selection)} title="Poner una copia de las páginas seleccionadas detrás de ellas">
-            Duplicar
+          <button disabled={!has} onClick={() => onDuplicate(selection)} title={t("Poner una copia de las páginas seleccionadas detrás de ellas")}>
+            {t("Duplicar")}
           </button>
-          <button disabled={!has} onClick={() => onExtract(selection)} title="Extraer las páginas seleccionadas">
-            Extraer…
+          <button disabled={!has} onClick={() => onExtract(selection)} title={t("Extraer las páginas seleccionadas")}>
+            {t("Extraer…")}
           </button>
         </div>
         <div className="group">
-          <span className="muted">Insertar {has ? `tras la ${Math.max(...selection) + 1}` : "al final"}:</span>
-          <button onClick={() => doc.insertBlank(insertAt, info.pages[insertAt - 1] ?? A4)}>Página en blanco</button>
-          <button onClick={insertPdfs}>Desde PDF…</button>
-          <button onClick={insertImages}>Imágenes…</button>
+          <span className="muted">{has ? t("Insertar tras la {n}:", { n: Math.max(...selection) + 1 }) : t("Insertar al final:")}</span>
+          <button onClick={() => doc.insertBlank(insertAt, info.pages[insertAt - 1] ?? A4)}>{t("Página en blanco")}</button>
+          <button onClick={insertPdfs}>{t("Desde PDF…")}</button>
+          <button onClick={insertImages}>{t("Imágenes…")}</button>
         </div>
-        <button onClick={() => setSplitting(true)}>Dividir…</button>
+        <button onClick={() => setSplitting(true)}>{t("Dividir…")}</button>
         <div className="spacer" />
         <span className="muted">{label}</span>
-        <label className="group muted" title="Tamaño de las miniaturas">
+        <label className="group muted" title={t("Tamaño de las miniaturas")}>
           ▫
           <input type="range" min={100} max={300} value={thumbWidth} onChange={(e) => setThumbWidth(Number(e.target.value))} />
           ◻
@@ -186,13 +188,13 @@ export function OrganizeView({ docId, info, doc, baseName, selection, anchor, on
             <LazyPage docId={docId} index={i} size={size} width={thumbWidth} root={gridRef} revision={doc.revision} />
             <span className="grid-number">{i + 1}</span>
             <div className="grid-actions" onPointerDown={(e) => e.stopPropagation()}>
-              <button onClick={() => doc.rotate([i], -90)} title="Girar a la izquierda" aria-label={`Girar página ${i + 1} a la izquierda`}>
+              <button onClick={() => doc.rotate([i], -90)} title={t("Girar a la izquierda")} aria-label={t("Girar página {n} a la izquierda", { n: i + 1 })}>
                 ↺
               </button>
-              <button onClick={() => doc.rotate([i], 90)} title="Girar a la derecha" aria-label={`Girar página ${i + 1} a la derecha`}>
+              <button onClick={() => doc.rotate([i], 90)} title={t("Girar a la derecha")} aria-label={t("Girar página {n} a la derecha", { n: i + 1 })}>
                 ↻
               </button>
-              <button onClick={() => remove([i])} title="Eliminar" aria-label={`Eliminar página ${i + 1}`}>
+              <button onClick={() => remove([i])} title={t("Eliminar")} aria-label={t("Eliminar página {n}", { n: i + 1 })}>
                 🗑
               </button>
             </div>
@@ -202,8 +204,7 @@ export function OrganizeView({ docId, info, doc, baseName, selection, anchor, on
 
       {drag && (
         <div className="drag-ghost" style={{ left: drag.x + 12, top: drag.y + 12 }}>
-          {drag.tab ? "Copiar a ese documento: " : ""}
-          {drag.pages.length === 1 ? `Página ${drag.pages[0] + 1}` : `${drag.pages.length} páginas`}
+          {drag.tab ? t("Copiar a ese documento: {pages}", { pages: dragLabel(drag.pages) }) : dragLabel(drag.pages)}
         </div>
       )}
 

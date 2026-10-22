@@ -2,6 +2,7 @@ import { useState } from "react";
 import { pdf } from "../pdf/client";
 import { fileName, pickCertificate, readFile } from "../files";
 import { type HandSignature, dataUrlToBytes, loadSaved } from "./signatures";
+import { locale, t } from "../i18n";
 
 export type CertificateChoice = { p12: Uint8Array; password: string; reason: string; location: string; image: Uint8Array | null };
 type Info = { name: string; issuer: string; validFrom: Date; validTo: Date };
@@ -12,7 +13,7 @@ type Props = {
   onCancel: () => void;
 };
 
-const date = (d: Date) => d.toLocaleDateString("es-ES");
+const date = (d: Date) => d.toLocaleDateString(locale());
 
 /** Elegir certificado (.p12/.pfx), comprobar la contraseña y los datos de la firma. */
 export function CertificateDialog({ hasTarget, onConfirm, onCancel }: Props) {
@@ -36,7 +37,7 @@ export function CertificateDialog({ hasTarget, onConfirm, onCancel }: Props) {
       setInfo(null);
       setError(null);
     } catch (e) {
-      setError(`No se pudo leer el certificado: ${e instanceof Error ? e.message : e}`);
+      setError(t("No se pudo leer el certificado: {error}", { error: e instanceof Error ? e.message : String(e) }));
     }
   }
 
@@ -62,24 +63,24 @@ export function CertificateDialog({ hasTarget, onConfirm, onCancel }: Props) {
       <form
         className="modal modal-wide"
         role="dialog"
-        aria-label="Firmar con certificado"
+        aria-label={t("Firmar con certificado")}
         onSubmit={(e) => {
           e.preventDefault();
           if (!info) check();
           else if (p12 && !expired) onConfirm({ p12, password, reason: reason.trim(), location: location.trim(), image: image ? dataUrlToBytes(image.dataUrl) : null });
         }}
       >
-        <h2>Firmar con certificado digital</h2>
-        <p>Usa un certificado en archivo .p12 o .pfx (por ejemplo, el de la FNMT exportado desde el navegador).</p>
+        <h2>{t("Firmar con certificado digital")}</h2>
+        <p>{t("Usa un certificado en archivo .p12 o .pfx (por ejemplo, el de la FNMT exportado desde el navegador).")}</p>
         <div className="props-row">
           <button type="button" onClick={choose}>
-            {path ? "Cambiar certificado…" : "Elegir certificado…"}
+            {path ? t("Cambiar certificado…") : t("Elegir certificado…")}
           </button>
           {path && <span className="file-name">{fileName(path)}</span>}
         </div>
         {p12 && (
           <label className="prop">
-            Contraseña del certificado
+            {t("Contraseña del certificado")}
             <input
               type="password"
               value={password}
@@ -95,50 +96,50 @@ export function CertificateDialog({ hasTarget, onConfirm, onCancel }: Props) {
         {info && (
           <div className={`cert-info ${expired ? "is-bad" : ""}`}>
             <strong>{info.name}</strong>
-            <span>Emitido por {info.issuer}</span>
+            <span>{t("Emitido por {issuer}", { issuer: info.issuer })}</span>
             <span>
-              Válido del {date(info.validFrom)} al {date(info.validTo)}
-              {expired && " — no está vigente"}
+              {t("Válido del {from} al {to}", { from: date(info.validFrom), to: date(info.validTo) })}
+              {expired && t(" — no está vigente")}
             </span>
           </div>
         )}
         {info && !expired && (
           <>
             <label className="prop">
-              Motivo (opcional)
-              <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej.: Conforme con el contenido" />
+              {t("Motivo (opcional)")}
+              <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("Ej.: Conforme con el contenido")} />
             </label>
             <label className="prop">
-              Lugar (opcional)
-              <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ej.: Madrid" />
+              {t("Lugar (opcional)")}
+              <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder={t("Ej.: Madrid")} />
             </label>
             {saved.length > 0 && (
               <label className="prop">
-                Imagen en la firma
+                {t("Imagen en la firma")}
                 <select value={imageId} onChange={(e) => setImageId(e.target.value)}>
-                  <option value="">Solo texto</option>
+                  <option value="">{t("Solo texto")}</option>
                   {saved.map((s, i) => (
                     <option key={s.id} value={s.id}>
-                      Firma manuscrita guardada {i + 1}
+                      {t("Firma manuscrita guardada {n}", { n: i + 1 })}
                     </option>
                   ))}
                 </select>
               </label>
             )}
-            {image && <img className="cert-preview" src={image.dataUrl} alt="Firma manuscrita elegida" />}
+            {image && <img className="cert-preview" src={image.dataUrl} alt={t("Firma manuscrita elegida")} />}
           </>
         )}
         <div className="modal-actions">
           <button type="button" onClick={onCancel}>
-            Cancelar
+            {t("Cancelar")}
           </button>
           {!info ? (
             <button type="submit" className="primary" disabled={!p12 || busy}>
-              {busy ? "Comprobando…" : "Comprobar"}
+              {busy ? t("Comprobando…") : t("Comprobar")}
             </button>
           ) : (
             <button type="submit" className="primary" disabled={!!expired}>
-              {hasTarget ? "Firmar…" : "Elegir dónde firmar"}
+              {hasTarget ? t("Firmar…") : t("Elegir dónde firmar")}
             </button>
           )}
         </div>

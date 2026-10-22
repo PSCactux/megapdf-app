@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { Point, Rect } from "../pdf/annotations";
 import { normRect } from "../annot/geometry";
+import { t } from "../i18n";
 
 type Props = {
   zoom: number;
@@ -20,7 +21,7 @@ export function SnapshotLayer({ zoom, onTake }: Props) {
     <div
       ref={ref}
       className="snapshot-layer"
-      title="Arrastra para copiar esa zona como imagen"
+      title={t("Arrastra para copiar esa zona como imagen")}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
         e.preventDefault();

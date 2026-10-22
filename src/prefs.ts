@@ -1,4 +1,5 @@
 /** Preferencias y documentos recientes de este equipo (almacenamiento local de la app). */
+import { type Lang, t } from "./i18n";
 
 export type Prefs = {
   /** Nombre en comentarios y sellos; vacío = el de la cuenta del sistema. */
@@ -7,6 +8,8 @@ export type Prefs = {
   useOffice: boolean;
   /** Zoom al abrir: ajustar al ancho de la ventana o tamaño real. */
   initialZoom: "fit" | "actual";
+  /** Idioma de la interfaz; sin elegir hasta el primer arranque (entonces se pregunta). */
+  language?: Lang;
 };
 
 const PREFS_KEY = "megapdf.prefs";
@@ -28,7 +31,7 @@ function write(key: string, value: unknown) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    throw new Error("No se pudieron guardar las preferencias en este equipo");
+    throw new Error(t("No se pudieron guardar las preferencias en este equipo"));
   }
 }
 

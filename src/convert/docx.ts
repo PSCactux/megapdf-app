@@ -1,5 +1,6 @@
 import { strFromU8, unzipSync } from "fflate";
 import { type XNode, attr, child, decodeXml, descendants, elements, escapeHtml, parseXml, path } from "./xml";
+import { t } from "../i18n";
 
 /**
  * Conversión propia de Word (.docx) a HTML+CSS, que luego MuPDF maqueta en páginas.
@@ -32,11 +33,11 @@ export function docxToHtml(bytes: Uint8Array): OfficeHtml {
   try {
     files = unzipSync(bytes);
   } catch {
-    throw new Error("El archivo no es un documento de Word válido (.docx)");
+    throw new Error(t("El archivo no es un documento de Word válido (.docx)"));
   }
   const read = (name: string) => (files[name] ? parseXml(strFromU8(files[name])) : undefined);
   const document = read("word/document.xml");
-  if (!document) throw new Error("El archivo no es un documento de Word válido (.docx)");
+  if (!document) throw new Error(t("El archivo no es un documento de Word válido (.docx)"));
   const rels = readRels(read("word/_rels/document.xml.rels"));
   const { styles, defaults } = readStyles(read("word/styles.xml"));
   const numbering = readNumbering(read("word/numbering.xml"));

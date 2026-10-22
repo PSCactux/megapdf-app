@@ -1,5 +1,6 @@
 import * as mupdf from "mupdf";
 import { pageOrigin } from "./annotations";
+import { t, tk } from "../i18n";
 
 // --- Contraseñas y permisos -------------------------------------------------
 
@@ -44,10 +45,10 @@ export function permissionsValue(p: Permissions): number {
 
 export function encryptOptions(p: Protection): string {
   if ("remove" in p) return "decrypt";
-  if (!p.userPassword && !p.ownerPassword) throw new Error("Indica al menos una contraseña");
+  if (!p.userPassword && !p.ownerPassword) throw new Error(t("Indica al menos una contraseña"));
   // Sin contraseña de propietario, cualquiera podría quitar las restricciones: se usa una aleatoria
   const owner = p.ownerPassword || crypto.randomUUID();
-  for (const pw of [p.userPassword, owner]) if (/[,=]/.test(pw)) throw new Error("Las contraseñas no pueden contener comas ni el signo =");
+  for (const pw of [p.userPassword, owner]) if (/[,=]/.test(pw)) throw new Error(t("Las contraseñas no pueden contener comas ni el signo ="));
   return `encrypt=aes-256,user-password=${p.userPassword},owner-password=${owner},permissions=${permissionsValue(p.permissions)}`;
 }
 
@@ -58,10 +59,10 @@ export type SensitiveHit = { page: number; kind: SensitiveKind; text: string; qu
 
 /** Patrones de datos personales habituales en documentos españoles. */
 export const PATTERNS: Record<Exclude<SensitiveKind, "text">, { label: string; regex: RegExp }> = {
-  dni: { label: "DNI y NIE", regex: /\b(?:\d{8}|[XYZ]\d{7})-?[A-Z]\b/g },
-  email: { label: "Correos electrónicos", regex: /\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b/g },
-  phone: { label: "Teléfonos", regex: /(?:\+34[ ]?)?\b[6789]\d{2}[ ]?\d{3}[ ]?\d{3}\b/g },
-  iban: { label: "Cuentas IBAN", regex: /\b[A-Z]{2}\d{2}(?:[ ]?\d{4}){5}\b/g },
+  dni: { label: tk("DNI y NIE"), regex: /\b(?:\d{8}|[XYZ]\d{7})-?[A-Z]\b/g },
+  email: { label: tk("Correos electrónicos"), regex: /\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b/g },
+  phone: { label: tk("Teléfonos"), regex: /(?:\+34[ ]?)?\b[6789]\d{2}[ ]?\d{3}[ ]?\d{3}\b/g },
+  iban: { label: tk("Cuentas IBAN"), regex: /\b[A-Z]{2}\d{2}(?:[ ]?\d{4}){5}\b/g },
 };
 
 /** Busca texto literal o patrones en todas las páginas y devuelve dónde están. */

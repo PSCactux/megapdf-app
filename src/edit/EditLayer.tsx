@@ -4,6 +4,7 @@ import type { ImageBlock, Overlay, TextBlock, TextData, TextLine, TextStyle } fr
 import { pdf } from "../pdf/client";
 import { css, type Handle, HANDLES, resizeRect, translateRect } from "../annot/geometry";
 import { cssFontFamily } from "./systemFonts";
+import { t } from "../i18n";
 
 export type EditTool = "select" | "text" | "image" | "link";
 /** Elemento seleccionado en modo Editar. */
@@ -58,7 +59,7 @@ export function EditLayer(props: Props) {
     let stale = false;
     pdf.call("content", [docId, page]).then(
       (c) => !stale && setContent(c),
-      (e) => props.onError(`No se pudo leer el contenido de la página ${page + 1}: ${e instanceof Error ? e.message : e}`),
+      (e) => props.onError(t("No se pudo leer el contenido de la página {page}: {error}", { page: page + 1, error: e instanceof Error ? e.message : String(e) })),
     );
     return () => {
       stale = true;
@@ -178,7 +179,7 @@ export function EditLayer(props: Props) {
               key={`i${i}`}
               className={`edit-image ${selected ? "is-selected" : ""}`}
               style={box(img.rect)}
-              title="Imagen del documento: selecciónala y pulsa Suprimir para quitarla"
+              title={t("Imagen del documento: selecciónala y pulsa Suprimir para quitarla")}
               onPointerDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -195,7 +196,7 @@ export function EditLayer(props: Props) {
               key={`l${i}`}
               className="edit-line"
               style={box(b.rect)}
-              title={b.lines.length > 1 ? "Haz clic para editar este párrafo" : "Haz clic para editar este texto"}
+              title={b.lines.length > 1 ? t("Haz clic para editar este párrafo") : t("Haz clic para editar este texto")}
               onPointerDown={(e) => {
                 // Sin esto, el mousedown posterior quita el foco al editor recién abierto
                 e.preventDefault();
@@ -215,7 +216,7 @@ export function EditLayer(props: Props) {
             key={`o${o.id}`}
             className={`edit-overlay ${selected ? "is-selected" : ""}`}
             style={box(r)}
-            title={o.kind === "text" ? "Doble clic para editar; arrastra para mover" : "Arrastra para mover; las esquinas cambian el tamaño"}
+            title={o.kind === "text" ? t("Doble clic para editar; arrastra para mover") : t("Arrastra para mover; las esquinas cambian el tamaño")}
             onPointerDown={(e) => onOverlayDown(e, o)}
             onPointerMove={onOverlayMove}
             onPointerUp={onOverlayUp}
@@ -261,9 +262,9 @@ export function EditLayer(props: Props) {
               autoFocus
               rows={1}
               value={data.text}
-              placeholder="Escribe…"
-              aria-label="Texto"
-              title="Intro para terminar · Mayús+Intro para empezar otra línea · Esc para descartar"
+              placeholder={t("Escribe…")}
+              aria-label={t("Texto")}
+              title={t("Intro para terminar · Mayús+Intro para empezar otra línea · Esc para descartar")}
               spellCheck={false}
               wrap={data.width ? "soft" : "off"}
               style={{

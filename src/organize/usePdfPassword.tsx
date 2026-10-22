@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { pdf } from "../pdf/client";
 import { fileName, readFile } from "../files";
+import { t } from "../i18n";
 
 type Prompt = { name: string; wrong: boolean; answer: (password: string | null) => void };
 
@@ -29,22 +30,22 @@ export function usePdfPassword() {
     <div className="modal-backdrop">
       <form
         className="modal"
-        aria-label="Documento protegido"
+        aria-label={t("Documento protegido")}
         onSubmit={(e) => {
           e.preventDefault();
           prompt.answer(new FormData(e.currentTarget).get("password") as string);
         }}
       >
-        <h2>Documento protegido</h2>
-        <p>{prompt.name} necesita contraseña para usar sus páginas.</p>
-        <input name="password" type="password" autoFocus placeholder="Contraseña" key={String(prompt.wrong)} />
-        {prompt.wrong && <p className="error-text">Contraseña incorrecta.</p>}
+        <h2>{t("Documento protegido")}</h2>
+        <p>{t("{name} necesita contraseña para usar sus páginas.", { name: prompt.name })}</p>
+        <input name="password" type="password" autoFocus placeholder={t("Contraseña")} key={String(prompt.wrong)} />
+        {prompt.wrong && <p className="error-text">{t("Contraseña incorrecta.")}</p>}
         <div className="modal-actions">
           <button type="button" onClick={() => prompt.answer(null)}>
-            Cancelar
+            {t("Cancelar")}
           </button>
           <button type="submit" className="primary">
-            Continuar
+            {t("Continuar")}
           </button>
         </div>
       </form>

@@ -2,6 +2,7 @@ import * as mupdf from "mupdf";
 import { type Point, type Rect, pageOrigin, pdfString, shiftRect, textWidth } from "./annotations";
 import { BYTE_RANGE_PLACEHOLDER, SIG_BYTES } from "./sign";
 import { type FieldFormat, displayValue, formatScripts, parseFormatScript, parseInput } from "./fieldFormat";
+import { t } from "../i18n";
 
 export type FieldKind = "text" | "checkbox" | "radio" | "combo" | "list" | "signature" | "button";
 
@@ -98,7 +99,7 @@ function readField(w: mupdf.PDFWidget, page: number, origin: Point): Field {
 
 export function setFieldValue(page: mupdf.PDFPage, fieldId: number, value: string | boolean) {
   const w = findWidget(page, fieldId);
-  if (w.isReadOnly()) throw new Error("El campo es de solo lectura");
+  if (w.isReadOnly()) throw new Error(t("El campo es de solo lectura"));
   if (w.isCheckbox() || w.isRadioButton()) {
     const checked = w.getObject().get("AS").isName() && w.getObject().get("AS").asName() === onState(w.getObject());
     if (checked !== value) w.toggle();
@@ -107,7 +108,7 @@ export function setFieldValue(page: mupdf.PDFPage, fieldId: number, value: strin
   } else if (w.isChoice()) {
     w.setChoiceValue(String(value));
   } else {
-    throw new Error("Este campo no se puede rellenar");
+    throw new Error(t("Este campo no se puede rellenar"));
   }
   w.update();
 }
@@ -132,7 +133,7 @@ export function createField(doc: mupdf.PDFDocument, page: mupdf.PDFPage, spec: N
       break;
     case "combo": {
       const opt = doc.newArray();
-      for (const o of spec.options ?? ["Opción 1", "Opción 2"]) opt.push(doc.newString(o));
+      for (const o of spec.options ?? [t("Opción 1"), t("Opción 2")]) opt.push(doc.newString(o));
       put({ FT: doc.newName("Ch"), Ff: FLAG.combo, T: doc.newString(name), DA: doc.newString("/Helv 0 Tf 0 g"), Opt: opt });
       break;
     }
@@ -182,7 +183,7 @@ export function patchField(page: mupdf.PDFPage, fieldId: number, patch: FieldPat
   const doc = page._doc;
   if (patch.name !== undefined) {
     const name = patch.name.trim();
-    if (!name || name.includes(".")) throw new Error("El nombre del campo no puede estar vacío ni contener puntos");
+    if (!name || name.includes(".")) throw new Error(t("El nombre del campo no puede estar vacío ni contener puntos"));
     field.put("T", doc.newString(name));
   }
   const setFlag = (flag: number, on: boolean | undefined) => {
@@ -194,7 +195,7 @@ export function patchField(page: mupdf.PDFPage, fieldId: number, patch: FieldPat
   setFlag(FLAG.readOnly, patch.readOnly);
   setFlag(FLAG.multiline, patch.multiline);
   if (patch.options) {
-    if (!patch.options.length) throw new Error("La lista necesita al menos una opción");
+    if (!patch.options.length) throw new Error(t("La lista necesita al menos una opción"));
     const opt = doc.newArray();
     for (const o of patch.options) opt.push(doc.newString(o));
     field.put("Opt", opt);
@@ -220,7 +221,7 @@ export function patchField(page: mupdf.PDFPage, fieldId: number, patch: FieldPat
 
 export function deleteField(doc: mupdf.PDFDocument, page: mupdf.PDFPage, fieldId: number) {
   const w = findWidget(page, fieldId);
-  if (w.getFieldType() === "signature" && !fieldDict(w.getObject()).get("V").isNull()) throw new Error("No se puede eliminar un campo ya firmado");
+  if (w.getFieldType() === "signature" && !fieldDict(w.getObject()).get("V").isNull()) throw new Error(t("No se puede eliminar un campo ya firmado"));
   const obj = w.getObject();
   const parent = obj.get("Parent");
   page.deleteAnnotation(w);
@@ -265,9 +266,9 @@ export function prepareSignatureField(
   existing: string[],
 ) {
   const widget = "fieldId" in target ? findWidget(page, target.fieldId) : createField(doc, page, { kind: "signature", rect: target.rect }, existing);
-  if (widget.getFieldType() !== "signature") throw new Error("El campo elegido no es un campo de firma");
+  if (widget.getFieldType() !== "signature") throw new Error(t("El campo elegido no es un campo de firma"));
   const field = fieldDict(widget.getObject());
-  if (!field.get("V").isNull()) throw new Error("Este campo ya está firmado");
+  if (!field.get("V").isNull()) throw new Error(t("Este campo ya está firmado"));
 
   const v = doc.addObject({
     Type: "Sig",
@@ -409,7 +410,7 @@ function safeDA(w: mupdf.PDFWidget): number | null {
 
 function findWidget(page: mupdf.PDFPage, id: number): mupdf.PDFWidget {
   const w = page.getWidgets().find((x) => x.getObject().asIndirect() === id);
-  if (!w) throw new Error(`El campo ${id} ya no existe en esta página`);
+  if (!w) throw new Error(t("El campo {id} ya no existe en esta página", { id }));
   return w;
 }
 

@@ -728,3 +728,9 @@ button.danger:hover:not(:disabled) { background: var(--error-bg); }
 
 .tab { touch-action: none; user-select: none; -webkit-user-select: none; }
 .tab.is-dragging { opacity: 0.6; }
+
+/* Idioma (primer arranque) */
+.language-dialog { max-width: 360px; }
+.language-options { display: grid; gap: 8px; margin: 12px 0; }
+.language-option { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 15px; }
+.language-option.is-on { border-color: var(--accent, #2563eb); background: color-mix(in srgb, var(--accent, #2563eb) 8%, transparent); }

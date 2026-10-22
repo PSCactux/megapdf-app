@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "../..");
-const ALL = ["visor", "anotaciones", "organizar", "formularios", "editar", "proteger", "convertir", "pulido", "ventanas", "marcadores", "documento", "lectura", "revision", "datos", "lote", "paginas"];
+const ALL = ["visor", "anotaciones", "organizar", "formularios", "editar", "proteger", "convertir", "pulido", "ventanas", "marcadores", "documento", "lectura", "revision", "datos", "lote", "paginas", "idiomas"];
 const args = process.argv.slice(2);
 const production = args.includes("--build");
 const names = args.filter((a) => a !== "--build");

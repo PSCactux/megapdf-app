@@ -3,6 +3,7 @@ import type { Point, Rect } from "../pdf/annotations";
 import type { PageLink } from "../pdf/document";
 import { pdf } from "../pdf/client";
 import { type Handle, HANDLES, normRect, resizeRect, translateRect } from "../annot/geometry";
+import { t } from "../i18n";
 
 type Props = {
   docId: string;
@@ -36,7 +37,7 @@ export function LinkLayer(props: Props) {
     let stale = false;
     pdf.call("links", [docId, page]).then(
       (l) => !stale && setLinks(l),
-      (e) => props.onError(`No se pudieron leer los enlaces de la página ${page + 1}: ${e instanceof Error ? e.message : e}`),
+      (e) => props.onError(t("No se pudieron leer los enlaces de la página {page}: {error}", { page: page + 1, error: e instanceof Error ? e.message : String(e) })),
     );
     return () => {
       stale = true;
@@ -49,7 +50,7 @@ export function LinkLayer(props: Props) {
     return [(e.clientX - r.left) / zoom, (e.clientY - r.top) / zoom];
   };
   const box = (r: Rect) => ({ left: r[0] * zoom, top: r[1] * zoom, width: (r[2] - r[0]) * zoom, height: (r[3] - r[1]) * zoom });
-  const label = (l: PageLink) => (l.page !== null ? `Ir a la página ${l.page + 1}` : l.uri);
+  const label = (l: PageLink) => (l.page !== null ? t("Ir a la página {n}", { n: l.page + 1 }) : l.uri);
 
   function start(e: React.PointerEvent, kind: Drag["kind"], link: PageLink | null) {
     if (e.button !== 0) return;
@@ -116,7 +117,7 @@ export function LinkLayer(props: Props) {
             key={l.index}
             className={`link-box ${isSelected ? "is-selected" : ""}`}
             style={box(rect)}
-            title={`${label(l)} · doble clic para cambiar el destino`}
+            title={t("{link} · doble clic para cambiar el destino", { link: label(l) })}
             onPointerDown={(e) => start(e, "move", l)}
             onDoubleClick={() => props.onEdit(l)}
           >
@@ -125,9 +126,9 @@ export function LinkLayer(props: Props) {
             {isSelected && !drag && (
               <div className="link-actions" onPointerDown={(e) => e.stopPropagation()}>
                 <span>{label(l)}</span>
-                <button onClick={() => props.onEdit(l)}>Cambiar…</button>
+                <button onClick={() => props.onEdit(l)}>{t("Cambiar…")}</button>
                 <button className="danger" onClick={() => props.onRemove(l)}>
-                  Eliminar
+                  {t("Eliminar")}
                 </button>
               </div>
             )}

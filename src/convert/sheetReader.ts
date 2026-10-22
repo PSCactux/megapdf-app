@@ -1,6 +1,7 @@
 import { strFromU8, unzipSync } from "fflate";
 import { attr, child, decodeXml, elements, parseXml, textOf } from "./xml";
 import { formatValue, parseRef, readStyles } from "./xlsx";
+import { t } from "../i18n";
 
 /**
  * Leer una tabla de datos (para rellenar formularios): la primera hoja visible de un Excel o un
@@ -15,18 +16,18 @@ function readXlsx(bytes: Uint8Array): string[][] {
   try {
     files = unzipSync(bytes);
   } catch {
-    throw new Error("El archivo no es un libro de Excel válido (.xlsx)");
+    throw new Error(t("El archivo no es un libro de Excel válido (.xlsx)"));
   }
   const read = (name: string) => (files[name] ? parseXml(strFromU8(files[name])) : undefined);
   const workbook = read("xl/workbook.xml");
-  if (!workbook) throw new Error("El archivo no es un libro de Excel válido (.xlsx)");
+  if (!workbook) throw new Error(t("El archivo no es un libro de Excel válido (.xlsx)"));
   const rels = new Map(elements(read("xl/_rels/workbook.xml.rels"), "Relationship").map((r) => [attr(r, "Id")!, attr(r, "Target")!]));
   const shared = elements(read("xl/sharedStrings.xml"), "si").map((si) => decodeXml(elements(si).filter((e) => e.tagName === "t" || e.tagName === "r").map((e) => (e.tagName === "t" ? textOf(e) : textOf(child(e, "t")))).join("")));
   const styles = readStyles(read("xl/styles.xml"));
   const sheet = elements(child(workbook, "sheets"), "sheet").find((s) => attr(s, "state") !== "hidden");
   const target = sheet && rels.get(attr(sheet, "r:id") ?? "");
   const xml = target && read(`xl/${target.replace(/^\/?xl\//, "")}`);
-  if (!xml) throw new Error("El libro no tiene ninguna hoja con datos");
+  if (!xml) throw new Error(t("El libro no tiene ninguna hoja con datos"));
   const rows: string[][] = [];
   for (const row of elements(child(xml, "sheetData"), "row")) {
     for (const c of elements(row, "c")) {
@@ -40,7 +41,7 @@ function readXlsx(bytes: Uint8Array): string[][] {
       if (type === "s") value = shared[Number(raw)] ?? "";
       else if (type === "inlineStr") value = decodeXml(textOf(child(child(c, "is"), "t")));
       else if (type === "str") value = decodeXml(raw);
-      else if (type === "b") value = raw === "1" ? "Sí" : "No";
+      else if (type === "b") value = raw === "1" ? t("Sí") : t("No");
       else if (raw !== "") value = isDateFormat(fmt) ? formatValue(Number(raw), fmt) : raw;
       (rows[r] ??= [])[col] = value;
     }

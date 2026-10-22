@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /** Operaciones puras sobre listas de páginas (índices desde 0). */
 
 const range = (from: number, to: number) => Array.from({ length: to - from }, (_, i) => from + i);
@@ -17,20 +18,20 @@ export function moveOrder(count: number, selected: number[], to: number): number
  */
 export function parseRanges(text: string, count: number): number[][] {
   const parts = text.split(/[,;]/).map((p) => p.trim()).filter(Boolean);
-  if (!parts.length) throw new Error("Escribe al menos un rango, por ejemplo 1-3, 5");
+  if (!parts.length) throw new Error(t("Escribe al menos un rango, por ejemplo 1-3, 5"));
   return parts.map((part) => {
     const m = part.match(/^(\d*)\s*(?:-\s*(\d*))?$/);
-    if (!m || (!m[1] && !m[2])) throw new Error(`Rango no válido: «${part}»`);
+    if (!m || (!m[1] && !m[2])) throw new Error(t("Rango no válido: «{rango}»", { rango: part }));
     const isRange = part.includes("-");
     const from = m[1] ? Number(m[1]) : 1;
     const to = isRange ? (m[2] ? Number(m[2]) : count) : from;
-    if (from < 1 || to > count || from > to) throw new Error(`El rango «${part}» está fuera del documento (1-${count})`);
+    if (from < 1 || to > count || from > to) throw new Error(t("El rango «{rango}» está fuera del documento (1-{total})", { rango: part, total: count }));
     return range(from - 1, to);
   });
 }
 
 export function splitEvery(count: number, n: number): number[][] {
-  if (!Number.isInteger(n) || n < 1) throw new Error("El número de páginas por archivo debe ser 1 o más");
+  if (!Number.isInteger(n) || n < 1) throw new Error(t("El número de páginas por archivo debe ser 1 o más"));
   const groups: number[][] = [];
   for (let i = 0; i < count; i += n) groups.push(range(i, Math.min(count, i + n)));
   return groups;

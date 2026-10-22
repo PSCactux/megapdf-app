@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { pdf } from "../pdf/client";
 import type { LineMatch, ReplaceOptions } from "../pdf/replace";
+import { t } from "../i18n";
 
 type Props = {
   docId: string;
@@ -29,7 +30,7 @@ export function FindReplaceDialog({ docId, onReplace, onGoTo, onClose, onError }
       setMatches(found);
       setChosen(new Set(found.map((_, i) => i)));
     } catch (e) {
-      onError(`No se pudo buscar: ${e instanceof Error ? e.message : e}`);
+      onError(t("No se pudo buscar: {error}", { error: e instanceof Error ? e.message : String(e) }));
     } finally {
       setBusy(false);
     }
@@ -62,36 +63,36 @@ export function FindReplaceDialog({ docId, onReplace, onGoTo, onClose, onError }
     <div className="modal-backdrop">
       <form
         className="modal modal-wide"
-        aria-label="Buscar y reemplazar"
+        aria-label={t("Buscar y reemplazar")}
         onSubmit={(e) => {
           e.preventDefault();
           if (matches) apply();
           else search();
         }}
       >
-        <h2>Buscar y reemplazar</h2>
+        <h2>{t("Buscar y reemplazar")}</h2>
         <div className="props-row">
           <label className="prop" style={{ flex: 1 }}>
-            Buscar
+            {t("Buscar")}
             <input id="find-text" value={find} autoFocus onChange={(e) => edit(() => setFind(e.target.value))} />
           </label>
           <label className="prop" style={{ flex: 1 }}>
-            Reemplazar por
+            {t("Reemplazar por")}
             <input id="replace-text" value={replacement} onChange={(e) => edit(() => setReplacement(e.target.value))} />
           </label>
         </div>
         <div className="props-row">
           <label className="check">
             <input type="checkbox" checked={options.matchCase} onChange={(e) => edit(() => setOptions({ ...options, matchCase: e.target.checked }))} />
-            Mayúsculas y minúsculas
+            {t("Mayúsculas y minúsculas")}
           </label>
           <label className="check">
             <input type="checkbox" checked={options.wholeWord} onChange={(e) => edit(() => setOptions({ ...options, wholeWord: e.target.checked }))} />
-            Solo palabras completas
+            {t("Solo palabras completas")}
           </label>
         </div>
-        {done !== null && <p className="info-text">{done === 1 ? "1 reemplazo hecho." : `${done} reemplazos hechos.`} Se puede deshacer con ⌘Z.</p>}
-        {matches && matches.length === 0 && <p className="muted">No aparece en el documento.</p>}
+        {done !== null && <p className="info-text">{done === 1 ? t("1 reemplazo hecho.") : t("{n} reemplazos hechos.", { n: done })} {t("Se puede deshacer con ⌘Z.")}</p>}
+        {matches && matches.length === 0 && <p className="muted">{t("No aparece en el documento.")}</p>}
         {matches && matches.length > 0 && (
           <ul className="hit-list replace-list">
             {matches.map((m, i) => (
@@ -108,7 +109,7 @@ export function FindReplaceDialog({ docId, onReplace, onGoTo, onClose, onError }
                     }}
                   />
                   <button type="button" className="link-button" onClick={() => onGoTo(m)}>
-                    p. {m.page + 1}
+                    {t("p. {n}", { n: m.page + 1 })}
                   </button>
                   <span className="replace-preview">
                     <s>{m.text}</s> → <span>{m.replaced}</span>
@@ -118,18 +119,18 @@ export function FindReplaceDialog({ docId, onReplace, onGoTo, onClose, onError }
             ))}
           </ul>
         )}
-        <p className="hint">Cada línea se reescribe entera con su mismo estilo; si el texto nuevo es más largo puede llegar a montarse sobre lo de al lado.</p>
+        <p className="hint">{t("Cada línea se reescribe entera con su mismo estilo; si el texto nuevo es más largo puede llegar a montarse sobre lo de al lado.")}</p>
         <div className="modal-actions">
           <button type="button" onClick={onClose}>
-            Cerrar
+            {t("Cerrar")}
           </button>
           {matches ? (
             <button type="submit" className="primary" disabled={busy || !total}>
-              Reemplazar ({total})
+              {t("Reemplazar ({n})", { n: total })}
             </button>
           ) : (
             <button type="submit" className="primary" disabled={busy || !find}>
-              Buscar
+              {t("Buscar")}
             </button>
           )}
         </div>

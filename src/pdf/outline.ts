@@ -1,4 +1,5 @@
 import * as mupdf from "mupdf";
+import { t } from "../i18n";
 
 /**
  * Edición de marcadores (el índice del PDF). Cada marcador se identifica por su ruta: la posición
@@ -49,17 +50,17 @@ export function addBookmark(doc: mupdf.PDFDocument, title: string, page: number)
 }
 
 export function renameBookmark(doc: mupdf.PDFDocument, path: number[], title: string) {
-  if (!title.trim()) throw new Error("El marcador necesita un nombre");
+  if (!title.trim()) throw new Error(t("El marcador necesita un nombre"));
   const it = at(doc, path);
   const item = it.item();
-  if (!item) throw new Error("Ese marcador ya no existe");
+  if (!item) throw new Error(t("Ese marcador ya no existe"));
   it.update({ ...item, title: title.trim() });
 }
 
 /** Quita el marcador y los que tiene dentro. */
 export function deleteBookmark(doc: mupdf.PDFDocument, path: number[]) {
   const it = at(doc, path);
-  if (!it.item()) throw new Error("Ese marcador ya no existe");
+  if (!it.item()) throw new Error(t("Ese marcador ya no existe"));
   it.delete();
 }
 

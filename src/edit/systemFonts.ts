@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { pdf } from "../pdf/client";
 import type { TextStyle } from "../pdf/content";
 import { readFile } from "../files";
+import { t } from "../i18n";
 
 type Found = { path: string; index: number; postscript: string };
 
@@ -30,8 +31,11 @@ export async function prepareFont(docId: string, page: number, style: TextStyle,
     }
     if (warned.has(req.key)) return null;
     warned.add(req.key);
-    const variant = [req.bold && "negrita", req.italic && "cursiva"].filter(Boolean).join(" y ");
-    return `La fuente ${req.family}${variant ? ` (${variant})` : ""} no está completa en el documento ni instalada en este equipo: el texto se ha escrito en ${STANDARD[style.family]}.`;
+    const variant = req.bold && req.italic ? t("negrita y cursiva") : req.bold ? t("negrita") : req.italic ? t("cursiva") : "";
+    const params = { font: req.family, variant, standard: STANDARD[style.family] };
+    return variant
+      ? t("La fuente {font} ({variant}) no está completa en el documento ni instalada en este equipo: el texto se ha escrito en {standard}.", params)
+      : t("La fuente {font} no está completa en el documento ni instalada en este equipo: el texto se ha escrito en {standard}.", params);
   } catch {
     // Sin la fuente del equipo se escribe con la estándar, como antes
     return null;

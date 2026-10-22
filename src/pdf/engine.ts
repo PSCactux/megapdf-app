@@ -4,6 +4,7 @@ import { type Field, type FieldPatch, type NewField, type SignatureAppearance, c
 import { type SignatureCheck, applySignature, loadIdentity, verifySignature } from "./sign";
 import * as content from "./content";
 import * as fonts from "./fonts";
+import { type Lang, locale, setLang, t, tk } from "../i18n";
 import * as security from "./security";
 import type { CleanOptions, CleanReport, CompressPreset, Protection, Security, SensitiveHit } from "./security";
 import { docxToHtml } from "../convert/docx";
@@ -76,6 +77,11 @@ export class Engine {
     const ok = this.get(id).authenticatePassword(password) !== 0;
     if (ok) this.startJournal(id);
     return ok;
+  }
+
+  /** Idioma de los textos que crea el motor (deshacer, errores, sellos, resúmenes). */
+  setLanguage(lang: Lang): void {
+    setLang(lang);
   }
 
   info(id: string): DocInfo {
@@ -260,7 +266,7 @@ export class Engine {
 
   /** Responde a un comentario. */
   replyToAnnotation(id: string, pageIndex: number, annotId: number, text: string, author: string): void {
-    this.operation(id, "Responder comentario", (doc) => {
+    this.operation(id, t("Responder comentario"), (doc) => {
       const page = doc.loadPage(pageIndex);
       review.addReply(page, findAnnot(page, annotId), text, author);
     });
@@ -268,26 +274,34 @@ export class Engine {
 
   /** Cambia el estado de revisión de un comentario. */
   setAnnotationState(id: string, pageIndex: number, annotId: number, state: review.ReviewState, author: string): void {
-    const label = { Accepted: "Aceptado", Rejected: "Rechazado", Cancelled: "Cancelado", Completed: "Completado", None: "Sin estado" }[state];
-    this.operation(id, `Marcar como ${label.toLowerCase()}`, (doc) => {
+    // El nombre del estado se escribe en el documento, como texto de la nota de estado
+    const label = { Accepted: t("Aceptado"), Rejected: t("Rechazado"), Cancelled: t("Cancelado"), Completed: t("Completado"), None: t("Sin estado") }[state];
+    const undo = {
+      Accepted: t("Marcar como aceptado"),
+      Rejected: t("Marcar como rechazado"),
+      Cancelled: t("Marcar como cancelado"),
+      Completed: t("Marcar como completado"),
+      None: t("Marcar como sin estado"),
+    }[state];
+    this.operation(id, undo, (doc) => {
       const page = doc.loadPage(pageIndex);
       review.setState(doc, page, findAnnot(page, annotId), state, author, label);
     });
   }
 
   editReply(id: string, pageIndex: number, replyId: number, text: string): void {
-    this.operation(id, "Editar respuesta", (doc) => review.editReply(findAnnot(doc.loadPage(pageIndex), replyId), text));
+    this.operation(id, t("Editar respuesta"), (doc) => review.editReply(findAnnot(doc.loadPage(pageIndex), replyId), text));
   }
 
   addAnnotation(id: string, pageIndex: number, spec: NewAnnot, author: string): Annot {
-    return this.operation(id, LABELS[spec.type] ?? "Añadir anotación", (doc) => {
+    return this.operation(id, spec.type in LABELS ? t(LABELS[spec.type]) : t("Añadir anotación"), (doc) => {
       const page = doc.loadPage(pageIndex);
       return readAnnot(createAnnot(doc, page, spec, author), pageIndex, pageOrigin(page));
     });
   }
 
   updateAnnotation(id: string, pageIndex: number, annotId: number, patch: AnnotPatch): Annot {
-    const label = patch.moveBy ? "Mover anotación" : patch.rect ? "Redimensionar anotación" : "Editar anotación";
+    const label = patch.moveBy ? t("Mover anotación") : patch.rect ? t("Redimensionar anotación") : t("Editar anotación");
     return this.operation(id, label, (doc) => {
       const page = doc.loadPage(pageIndex);
       return readAnnot(patchAnnot(doc, page, findAnnot(page, annotId), patch), pageIndex, pageOrigin(page));
@@ -296,7 +310,7 @@ export class Engine {
 
   /** Borra la anotación con sus respuestas y estados (o una sola respuesta). */
   deleteAnnotation(id: string, pageIndex: number, annotId: number): void {
-    this.operation(id, "Eliminar anotación", (doc) => {
+    this.operation(id, t("Eliminar anotación"), (doc) => {
       const page = doc.loadPage(pageIndex);
       const replies = page.getAnnotations().filter((a) => review.isReply(a) && review.rootOf(a) === annotId);
       page.deleteAnnotation(findAnnot(page, annotId));
@@ -328,7 +342,7 @@ export class Engine {
 
   /** Rellena el formulario con valores por nombre de campo, en un solo paso del historial. */
   fillForm(id: string, values: Record<string, string>): formData.FillReport {
-    return this.operation(id, "Importar datos del formulario", (doc) => formData.fillFields(doc, values));
+    return this.operation(id, t("Importar datos del formulario"), (doc) => formData.fillFields(doc, values));
   }
 
   /** Un PDF relleno por cada fila, a partir del documento tal como está (sin tocarlo). */
@@ -348,7 +362,7 @@ export class Engine {
   /** Rellena con los datos de un XFDF (exportado de Acrobat o de MegaPDF). */
   fillFormXfdf(id: string, xml: string): formData.FillReport {
     const values = formData.fromXfdf(xml);
-    return this.operation(id, "Importar datos del formulario", (doc) => formData.fillFields(doc, values));
+    return this.operation(id, t("Importar datos del formulario"), (doc) => formData.fillFields(doc, values));
   }
 
   exportXfdf(id: string, fileName: string): string {
@@ -360,33 +374,33 @@ export class Engine {
   }
 
   setFieldValue(id: string, page: number, fieldId: number, value: string | boolean): void {
-    this.operation(id, "Rellenar campo", (doc) => setFieldValue(doc.loadPage(page), fieldId, value));
+    this.operation(id, t("Rellenar campo"), (doc) => setFieldValue(doc.loadPage(page), fieldId, value));
   }
 
   addField(id: string, page: number, spec: NewField): Field {
-    return this.operation(id, "Añadir campo", (doc) => {
+    return this.operation(id, t("Añadir campo"), (doc) => {
       const w = createField(doc, doc.loadPage(page), spec, readFields(doc).map((f) => f.name));
       return readFields(doc).find((f) => f.id === w.getObject().asIndirect())!;
     });
   }
 
   updateField(id: string, page: number, fieldId: number, patch: FieldPatch): void {
-    const label = patch.moveBy ? "Mover campo" : patch.rect ? "Redimensionar campo" : "Editar campo";
+    const label = patch.moveBy ? t("Mover campo") : patch.rect ? t("Redimensionar campo") : t("Editar campo");
     this.operation(id, label, (doc) => patchField(doc.loadPage(page), fieldId, patch));
   }
 
   deleteField(id: string, page: number, fieldId: number): void {
-    this.operation(id, "Eliminar campo", (doc) => deleteField(doc, doc.loadPage(page), fieldId));
+    this.operation(id, t("Eliminar campo"), (doc) => deleteField(doc, doc.loadPage(page), fieldId));
   }
 
   resetForm(id: string): void {
-    this.operation(id, "Vaciar formulario", (doc) => resetFields(doc));
+    this.operation(id, t("Vaciar formulario"), (doc) => resetFields(doc));
   }
 
   /** Convierte campos y anotaciones en contenido fijo de la página. */
   flatten(id: string): void {
-    this.operation(id, "Aplanar formulario", (doc) => {
-      if (this.signatureFields(doc).length) throw new Error("No se puede aplanar un documento firmado: invalidaría las firmas");
+    this.operation(id, t("Aplanar formulario"), (doc) => {
+      if (this.signatureFields(doc).length) throw new Error(t("No se puede aplanar un documento firmado: invalidaría las firmas"));
       doc.bake(true, true);
     });
     // bake no actualiza las páginas ya cargadas; deshacer y rehacer obliga a MuPDF a
@@ -428,16 +442,16 @@ export class Engine {
     const identity = loadIdentity(req.p12, req.password);
     const date = new Date();
     if (date > identity.validTo || date < identity.validFrom) {
-      throw new Error(`El certificado no está vigente (válido del ${identity.validFrom.toLocaleDateString("es-ES")} al ${identity.validTo.toLocaleDateString("es-ES")})`);
+      throw new Error(t("El certificado no está vigente (válido del {desde} al {hasta})", { desde: identity.validFrom.toLocaleDateString(locale()), hasta: identity.validTo.toLocaleDateString(locale()) }));
     }
     const doc = this.pdf(id);
-    if (!doc.getTrailer().get("Encrypt").isNull()) throw new Error("Quita la contraseña del documento antes de firmarlo");
+    if (!doc.getTrailer().get("Encrypt").isNull()) throw new Error(t("Quita la contraseña del documento antes de firmarlo"));
     const lines = [
-      "Firmado digitalmente por",
+      t("Firmado digitalmente por"),
       identity.name,
-      `Fecha: ${date.toLocaleString("es-ES")}`,
-      ...(req.reason ? [`Motivo: ${req.reason}`] : []),
-      ...(req.location ? [`Lugar: ${req.location}`] : []),
+      t("Fecha: {fecha}", { fecha: date.toLocaleString(locale()) }),
+      ...(req.reason ? [t("Motivo: {motivo}", { motivo: req.reason })] : []),
+      ...(req.location ? [t("Lugar: {lugar}", { lugar: req.location })] : []),
     ];
     const appearance: SignatureAppearance = { lines, image: req.image };
     // Se prepara el campo dentro de una operación y se deshace al terminar: el
@@ -478,12 +492,12 @@ export class Engine {
 
   /** Devuelve el id del texto añadido. */
   addText(id: string, page: number, data: TextData): number {
-    return this.operation(id, "Añadir texto", (doc) => content.addText(doc, doc.loadPage(page), data));
+    return this.operation(id, t("Añadir texto"), (doc) => content.addText(doc, doc.loadPage(page), data));
   }
 
   /** Varias líneas de texto (lo pegado) en un solo paso del historial; devuelve sus ids. */
   addTexts(id: string, page: number, items: TextData[]): number[] {
-    return this.operation(id, "Pegar texto", (doc) => {
+    return this.operation(id, t("Pegar texto"), (doc) => {
       const p = doc.loadPage(page);
       return items.map((d) => content.addText(doc, p, d));
     });
@@ -491,17 +505,17 @@ export class Engine {
 
   /** Devuelve el id de la imagen añadida. */
   addImage(id: string, page: number, bytes: Uint8Array, rect: [number, number, number, number]): number {
-    return this.operation(id, "Añadir imagen", (doc) => content.addImage(doc, doc.loadPage(page), bytes, rect));
+    return this.operation(id, t("Añadir imagen"), (doc) => content.addImage(doc, doc.loadPage(page), bytes, rect));
   }
 
   /** Devuelve el id resultante (los textos cambian de id al reescribirse). */
   updateOverlay(id: string, page: number, overlayId: number, patch: Parameters<typeof content.updateOverlay>[3]): number | null {
-    const label = patch.moveBy ? "Mover" : patch.rect ? "Cambiar tamaño" : "Editar texto";
+    const label = patch.moveBy ? t("Mover") : patch.rect ? t("Cambiar tamaño") : t("Editar texto");
     return this.operation(id, label, (doc) => content.updateOverlay(doc, doc.loadPage(page), overlayId, patch));
   }
 
   removeOverlay(id: string, page: number, overlayId: number): void {
-    this.operation(id, "Eliminar", (doc) => content.removeOverlay(doc.loadPage(page), overlayId));
+    this.operation(id, t("Eliminar"), (doc) => content.removeOverlay(doc.loadPage(page), overlayId));
   }
 
   /** Líneas donde aparece el texto, con cómo quedarían (no cambia nada). */
@@ -511,12 +525,12 @@ export class Engine {
 
   /** Reemplaza en las líneas elegidas, en un solo paso del historial. Devuelve cuántas veces. */
   replaceText(id: string, chosen: replace.LineMatch[], find: string, replacement: string, options: replace.ReplaceOptions): number {
-    return this.operation(id, "Reemplazar texto", (doc) => replace.replaceLines(doc, chosen, find, replacement, options));
+    return this.operation(id, t("Reemplazar texto"), (doc) => replace.replaceLines(doc, chosen, find, replacement, options));
   }
 
   /** Sustituye un párrafo del texto original por el texto editado (`data`: texto, caja y estilo). */
   replaceBlock(id: string, page: number, block: TextBlock, data: TextData): void {
-    this.operation(id, "Editar texto", (doc) => content.replaceBlock(doc, doc.loadPage(page), block, data));
+    this.operation(id, t("Editar texto"), (doc) => content.replaceBlock(doc, doc.loadPage(page), block, data));
   }
 
   /**
@@ -534,11 +548,11 @@ export class Engine {
   }
 
   replaceLine(id: string, page: number, line: TextLine, text: string, style: TextStyle): void {
-    this.operation(id, "Editar texto", (doc) => content.replaceLine(doc, doc.loadPage(page), line, text, style));
+    this.operation(id, t("Editar texto"), (doc) => content.replaceLine(doc, doc.loadPage(page), line, text, style));
   }
 
   removeImage(id: string, page: number, rect: [number, number, number, number]): void {
-    this.operation(id, "Eliminar imagen", (doc) => content.removeImage(doc.loadPage(page), rect));
+    this.operation(id, t("Eliminar imagen"), (doc) => content.removeImage(doc.loadPage(page), rect));
   }
 
   /** Qué decoraciones tiene el documento. */
@@ -553,7 +567,7 @@ export class Engine {
 
   /** Pone encabezado y pie en todas las páginas (sustituye los anteriores). */
   setHeaderFooter(id: string, hf: HeaderFooter): void {
-    this.operation(id, "Encabezado y pie", (doc) => {
+    this.operation(id, t("Encabezado y pie"), (doc) => {
       const pages = this.allPages(doc);
       content.removeDecoration(pages, "header-footer");
       content.addHeaderFooter(doc, pages, hf, new Date());
@@ -562,7 +576,7 @@ export class Engine {
 
   /** Numera todas las páginas (sustituye la numeración anterior) y devuelve la primera y la última etiqueta. */
   setBates(id: string, bates: Bates): [string, string] {
-    return this.operation(id, "Numeración Bates", (doc) => {
+    return this.operation(id, t("Numeración Bates"), (doc) => {
       const pages = this.allPages(doc);
       content.removeDecoration(pages, "bates");
       const labels = content.addBates(doc, pages, bates);
@@ -571,7 +585,7 @@ export class Engine {
   }
 
   setWatermark(id: string, wm: Watermark): void {
-    this.operation(id, "Marca de agua", (doc) => {
+    this.operation(id, t("Marca de agua"), (doc) => {
       const pages = this.allPages(doc);
       content.removeDecoration(pages, "watermark");
       content.addWatermark(doc, pages, wm);
@@ -579,7 +593,7 @@ export class Engine {
   }
 
   removeDecoration(id: string, kind: PageDecoration): void {
-    const label = { "header-footer": "Quitar encabezado y pie", bates: "Quitar numeración Bates", watermark: "Quitar marca de agua" }[kind];
+    const label = { "header-footer": t("Quitar encabezado y pie"), bates: t("Quitar numeración Bates"), watermark: t("Quitar marca de agua") }[kind];
     this.operation(id, label, (doc) => content.removeDecoration(this.allPages(doc), kind));
   }
 
@@ -595,7 +609,7 @@ export class Engine {
    * gira antes la página (estaba de lado o al revés); las palabras ya vienen en su nueva orientación.
    */
   addOcrText(id: string, pages: { page: number; words: content.OcrWord[]; rotate?: number }[]): number {
-    return this.operation(id, "Reconocer texto (OCR)", (doc) => {
+    return this.operation(id, t("Reconocer texto (OCR)"), (doc) => {
       let words = 0;
       for (const p of pages) {
         if (p.rotate) {
@@ -638,17 +652,17 @@ export class Engine {
   }
 
   markRedactions(id: string, hits: SensitiveHit[], author: string): number {
-    return this.operation(id, "Marcar para redactar", (doc) => security.markRedactions(doc, hits, author));
+    return this.operation(id, t("Marcar para redactar"), (doc) => security.markRedactions(doc, hits, author));
   }
 
   applyRedactions(id: string): number {
-    const applied = this.operation(id, "Aplicar redacciones", (doc) => security.applyRedactions(doc));
+    const applied = this.operation(id, t("Aplicar redacciones"), (doc) => security.applyRedactions(doc));
     if (applied) this.mustRewrite.add(id);
     return applied;
   }
 
   removeHiddenInfo(id: string, opts: CleanOptions): CleanReport {
-    const report = this.operation(id, "Eliminar información oculta", (doc) => security.removeHiddenInfo(doc, opts));
+    const report = this.operation(id, t("Eliminar información oculta"), (doc) => security.removeHiddenInfo(doc, opts));
     this.mustRewrite.add(id);
     return report;
   }
@@ -700,7 +714,7 @@ export class Engine {
   }
 
   setProperties(id: string, p: docs.DocProperties): void {
-    this.operation(id, "Cambiar propiedades del documento", (doc) => docs.writeProperties(doc, p));
+    this.operation(id, t("Cambiar propiedades del documento"), (doc) => docs.writeProperties(doc, p));
   }
 
   attachments(id: string): docs.Attachment[] {
@@ -712,11 +726,11 @@ export class Engine {
   }
 
   addAttachment(id: string, name: string, bytes: Uint8Array): string {
-    return this.operation(id, "Adjuntar archivo", (doc) => docs.addAttachment(doc, name, bytes));
+    return this.operation(id, t("Adjuntar archivo"), (doc) => docs.addAttachment(doc, name, bytes));
   }
 
   removeAttachment(id: string, key: string): void {
-    this.operation(id, "Quitar adjunto", (doc) => docs.removeAttachment(doc, key));
+    this.operation(id, t("Quitar adjunto"), (doc) => docs.removeAttachment(doc, key));
   }
 
   embeddedImages(id: string, pages?: number[]): docs.EmbeddedImage[] {
@@ -728,15 +742,15 @@ export class Engine {
   }
 
   addLink(id: string, page: number, rect: Rect, target: docs.LinkTarget): void {
-    this.operation(id, "Añadir enlace", (doc) => docs.addLink(doc, page, rect, target));
+    this.operation(id, t("Añadir enlace"), (doc) => docs.addLink(doc, page, rect, target));
   }
 
   updateLink(id: string, page: number, index: number, patch: { rect?: Rect; target?: docs.LinkTarget }): void {
-    this.operation(id, "Cambiar enlace", (doc) => docs.updateLink(doc, page, index, patch));
+    this.operation(id, t("Cambiar enlace"), (doc) => docs.updateLink(doc, page, index, patch));
   }
 
   removeLink(id: string, page: number, index: number): void {
-    this.operation(id, "Eliminar enlace", (doc) => docs.removeLink(doc, page, index));
+    this.operation(id, t("Eliminar enlace"), (doc) => docs.removeLink(doc, page, index));
   }
 
   // --- Marcadores ------------------------------------------------------------
@@ -749,31 +763,31 @@ export class Engine {
 
   /** Crea los marcadores elegidos (anidados por nivel), añadiéndolos o sustituyendo los que había. */
   addBookmarksFromHeadings(id: string, items: headings.Heading[], replace: boolean): void {
-    this.operation(id, "Crear marcadores desde los títulos", (doc) => headings.writeHeadings(doc, items, replace));
+    this.operation(id, t("Crear marcadores desde los títulos"), (doc) => headings.writeHeadings(doc, items, replace));
   }
 
   /** Añade un marcador a la página y devuelve su ruta en el índice. */
   addBookmark(id: string, title: string, page: number): number[] {
-    return this.operation(id, "Añadir marcador", (doc) => outline.addBookmark(doc, title, page));
+    return this.operation(id, t("Añadir marcador"), (doc) => outline.addBookmark(doc, title, page));
   }
 
   renameBookmark(id: string, path: number[], title: string): void {
-    this.operation(id, "Cambiar nombre del marcador", (doc) => outline.renameBookmark(doc, path, title));
+    this.operation(id, t("Cambiar nombre del marcador"), (doc) => outline.renameBookmark(doc, path, title));
   }
 
   deleteBookmark(id: string, path: number[]): void {
-    this.operation(id, "Eliminar marcador", (doc) => outline.deleteBookmark(doc, path));
+    this.operation(id, t("Eliminar marcador"), (doc) => outline.deleteBookmark(doc, path));
   }
 
   moveBookmark(id: string, path: number[], delta: -1 | 1): number[] {
-    return this.operation(id, "Mover marcador", (doc) => outline.moveBookmark(doc, path, delta));
+    return this.operation(id, t("Mover marcador"), (doc) => outline.moveBookmark(doc, path, delta));
   }
 
   // --- Páginas --------------------------------------------------------------
 
   /** Gira las páginas `delta` grados (múltiplo de 90, positivo = horario). */
   rotatePages(id: string, pages: number[], delta: number): void {
-    this.operation(id, "Girar páginas", (doc) => {
+    this.operation(id, t("Girar páginas"), (doc) => {
       for (const i of pages) {
         const obj = doc.findPage(i);
         const current = obj.getInheritable("Rotate");
@@ -784,19 +798,19 @@ export class Engine {
   }
 
   deletePages(id: string, pages: number[]): void {
-    this.operation(id, pages.length === 1 ? "Eliminar página" : "Eliminar páginas", (doc) => {
-      if (new Set(pages).size >= doc.countPages()) throw new Error("No se pueden eliminar todas las páginas de un documento");
+    this.operation(id, pages.length === 1 ? t("Eliminar página") : t("Eliminar páginas"), (doc) => {
+      if (new Set(pages).size >= doc.countPages()) throw new Error(t("No se pueden eliminar todas las páginas de un documento"));
       for (const i of [...new Set(pages)].sort((a, b) => b - a)) doc.deletePage(i);
     });
   }
 
   /** Mueve las páginas para que queden delante de la posición `to` del orden actual. */
   movePages(id: string, pages: number[], to: number): void {
-    this.operation(id, "Mover páginas", (doc) => doc.rearrangePages(moveOrder(doc.countPages(), pages, to)));
+    this.operation(id, t("Mover páginas"), (doc) => doc.rearrangePages(moveOrder(doc.countPages(), pages, to)));
   }
 
   insertBlankPage(id: string, at: number, size: PageSize): void {
-    this.operation(id, "Insertar página en blanco", (doc) => {
+    this.operation(id, t("Insertar página en blanco"), (doc) => {
       doc.insertPage(at, doc.addPage([0, 0, size.width, size.height], 0, {}, ""));
     });
   }
@@ -814,7 +828,7 @@ export class Engine {
   /** Copia sin cifrar de un PDF con contraseña de apertura; null si la contraseña no es correcta. */
   decryptPdf(bytes: Uint8Array, password: string): Uint8Array | null {
     const doc = mupdf.Document.openDocument(bytes, "application/pdf").asPDF();
-    if (!doc) throw new Error("No es un PDF válido");
+    if (!doc) throw new Error(t("No es un PDF válido"));
     try {
       if (!doc.authenticatePassword(password)) return null;
       return doc.saveToBuffer("encrypt=none").asUint8Array().slice();
@@ -826,7 +840,7 @@ export class Engine {
   /** Inserta todas las páginas de otro PDF en la posición `at`. Devuelve cuántas. */
   insertPdf(id: string, at: number, bytes: Uint8Array): number {
     const src = openSource(bytes);
-    return this.operation(id, "Insertar páginas", (doc) => {
+    return this.operation(id, t("Insertar páginas"), (doc) => {
       const n = src.countPages();
       graftPages(doc, at, src, range(n));
       return n;
@@ -865,7 +879,7 @@ export class Engine {
   duplicatePages(id: string, pages: number[]): number {
     const sorted = [...new Set(pages)].sort((a, b) => a - b);
     const copy = openSource(this.extractPages(id, sorted));
-    return this.operation(id, sorted.length === 1 ? "Duplicar página" : "Duplicar páginas", (doc) => {
+    return this.operation(id, sorted.length === 1 ? t("Duplicar página") : t("Duplicar páginas"), (doc) => {
       graftPages(doc, sorted[sorted.length - 1] + 1, copy, range(sorted.length));
       return sorted.length;
     });
@@ -875,18 +889,18 @@ export class Engine {
   replacePages(id: string, targets: number[], bytes: Uint8Array, from: number[]): void {
     const src = openSource(bytes);
     const missing = from.find((p) => p < 0 || p >= src.countPages());
-    if (missing !== undefined) throw new Error(`El otro PDF no tiene página ${missing + 1}`);
-    this.operation(id, targets.length === 1 ? "Sustituir página" : "Sustituir páginas", (doc) => docs.replacePages(doc, targets, src, from));
+    if (missing !== undefined) throw new Error(t("El otro PDF no tiene página {n}", { n: missing + 1 }));
+    this.operation(id, targets.length === 1 ? t("Sustituir página") : t("Sustituir páginas"), (doc) => docs.replacePages(doc, targets, src, from));
   }
 
   /** Recorta las páginas quitando esos márgenes (en puntos, según se ven). */
   cropPages(id: string, pages: number[], margins: docs.Margins): void {
-    this.operation(id, pages.length === 1 ? "Recortar página" : "Recortar páginas", (doc) => docs.cropPages(doc, pages, margins));
+    this.operation(id, pages.length === 1 ? t("Recortar página") : t("Recortar páginas"), (doc) => docs.cropPages(doc, pages, margins));
   }
 
   /** Quita los márgenes en blanco de cada página (calculados en cada una). Devuelve cuántas se recortaron. */
   cropWhiteMargins(id: string, pages: number[]): number {
-    return this.operation(id, "Quitar márgenes en blanco", (doc) => {
+    return this.operation(id, t("Quitar márgenes en blanco"), (doc) => {
       let n = 0;
       for (const i of pages) {
         const m = docs.whiteMargins(doc.loadPage(i));
@@ -900,7 +914,7 @@ export class Engine {
   }
 
   uncropPages(id: string, pages: number[]): void {
-    this.operation(id, "Quitar recorte", (doc) => docs.uncropPages(doc, pages));
+    this.operation(id, t("Quitar recorte"), (doc) => docs.uncropPages(doc, pages));
   }
 
   /** Márgenes en blanco de una página, para recortarlos. */
@@ -915,7 +929,7 @@ export class Engine {
 
   /** Cada imagen (PNG, JPEG…) pasa a ser una página de su mismo tamaño. */
   insertImages(id: string, at: number, images: Uint8Array[]): void {
-    this.operation(id, images.length === 1 ? "Insertar imagen" : "Insertar imágenes", (doc) => {
+    this.operation(id, images.length === 1 ? t("Insertar imagen") : t("Insertar imágenes"), (doc) => {
       images.forEach((bytes, k) => doc.insertPage(at + k, imagePage(doc, bytes)));
     });
   }
@@ -954,7 +968,7 @@ export class Engine {
   /** Diferencias de texto entre otra versión (anterior) y el documento abierto. */
   compare(id: string, previous: Uint8Array): Change[] {
     const old = mupdf.Document.openDocument(previous, "application/pdf");
-    if (old.needsPassword()) throw new Error("La otra versión está protegida con contraseña");
+    if (old.needsPassword()) throw new Error(t("La otra versión está protegida con contraseña"));
     try {
       return compareDocuments(old, this.get(id));
     } finally {
@@ -1046,31 +1060,31 @@ export class Engine {
 
   private pdf(id: string): mupdf.PDFDocument {
     const pdf = this.get(id).asPDF();
-    if (!pdf) throw new Error("El documento no es un PDF");
+    if (!pdf) throw new Error(t("El documento no es un PDF"));
     return pdf;
   }
 
   private get(id: string): mupdf.Document {
     const doc = this.docs.get(id);
-    if (!doc) throw new Error(`Documento ${id} no está abierto`);
+    if (!doc) throw new Error(t("Documento {id} no está abierto", { id }));
     return doc;
   }
 }
 
 const LABELS: Record<string, string> = {
-  ImageStamp: "Añadir sello",
-  Mark: "Añadir marca",
-  Measure: "Medir",
-  Highlight: "Resaltar",
-  Underline: "Subrayar",
-  StrikeOut: "Tachar",
-  Text: "Añadir nota",
-  FreeText: "Añadir texto",
-  Square: "Añadir rectángulo",
-  Circle: "Añadir elipse",
-  Line: "Añadir línea",
-  Ink: "Dibujar",
-  Stamp: "Añadir sello",
+  ImageStamp: tk("Añadir sello"),
+  Mark: tk("Añadir marca"),
+  Measure: tk("Medir"),
+  Highlight: tk("Resaltar"),
+  Underline: tk("Subrayar"),
+  StrikeOut: tk("Tachar"),
+  Text: tk("Añadir nota"),
+  FreeText: tk("Añadir texto"),
+  Square: tk("Añadir rectángulo"),
+  Circle: tk("Añadir elipse"),
+  Line: tk("Añadir línea"),
+  Ink: tk("Dibujar"),
+  Stamp: tk("Añadir sello"),
 };
 
 const range = (n: number) => Array.from({ length: n }, (_, i) => i);
@@ -1098,10 +1112,15 @@ function renderPage(page: mupdf.Page, scale: number): mupdf.Pixmap {
 }
 
 function openSource(bytes: Uint8Array, position?: number): mupdf.PDFDocument {
-  const which = position ? `El archivo nº ${position}` : "El PDF";
   const doc = mupdf.Document.openDocument(bytes, "application/pdf").asPDF();
-  if (!doc) throw new Error(`${which} no es un PDF válido`);
-  if (doc.needsPassword()) throw new Error(`${which} está protegido con contraseña: ábrelo, quítale la contraseña y vuelve a intentarlo`);
+  if (!doc) throw new Error(position ? t("El archivo nº {n} no es un PDF válido", { n: position }) : t("El PDF no es un PDF válido"));
+  if (doc.needsPassword()) {
+    throw new Error(
+      position
+        ? t("El archivo nº {n} está protegido con contraseña: ábrelo, quítale la contraseña y vuelve a intentarlo", { n: position })
+        : t("El PDF está protegido con contraseña: ábrelo, quítale la contraseña y vuelve a intentarlo"),
+    );
+  }
   return doc;
 }
 
@@ -1116,7 +1135,7 @@ function imagePage(doc: mupdf.PDFDocument, bytes: Uint8Array): mupdf.PDFObject {
 
 function findAnnot(page: mupdf.PDFPage, annotId: number): mupdf.PDFAnnotation {
   const annot = page.getAnnotations().find((a) => a.getObject().asIndirect() === annotId);
-  if (!annot) throw new Error(`La anotación ${annotId} ya no existe en esta página`);
+  if (!annot) throw new Error(t("La anotación {id} ya no existe en esta página", { id: annotId }));
   return annot;
 }
 

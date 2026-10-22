@@ -1,5 +1,6 @@
 import type { RGB } from "../pdf/annotations";
 import { STAMPS } from "./tools";
+import { t } from "../i18n";
 
 /** Sello de la barra: de texto (con autor y fecha debajo) o de imagen. */
 export type StampChoice = { kind: "text"; label: string; rgb: RGB } | { kind: "image"; id: string; name: string; dataUrl: string; width: number; height: number };
@@ -22,13 +23,13 @@ export function saveCustomStamps(list: StampChoice[]) {
   try {
     localStorage.setItem(KEY, JSON.stringify(list.slice(0, MAX_SAVED)));
   } catch {
-    throw new Error("No se pudieron guardar los sellos en este equipo (¿imagen demasiado grande?)");
+    throw new Error(t("No se pudieron guardar los sellos en este equipo (¿imagen demasiado grande?)"));
   }
 }
 
-/** Todos los sellos que ofrece la barra: los de serie y los propios. */
+/** Todos los sellos que ofrece la barra: los de serie (en el idioma de la interfaz) y los propios. */
 export function allStamps(custom: StampChoice[]): StampChoice[] {
-  const all: StampChoice[] = [...STAMPS.map((s) => ({ kind: "text" as const, ...s })), ...custom];
+  const all: StampChoice[] = [...STAMPS.map((s) => ({ kind: "text" as const, label: t(s.label), rgb: s.rgb })), ...custom];
   // Un sello propio con el mismo texto que otro no se repite en la lista
   return all.filter((s, i) => all.findIndex((o) => stampKey(o) === stampKey(s)) === i);
 }

@@ -1,6 +1,7 @@
 import { strFromU8, unzipSync } from "fflate";
 import { type XNode, attr, child, decodeXml, elements, escapeHtml, parseXml, textOf } from "./xml";
 import type { OfficeHtml } from "./docx";
+import { locale, t } from "../i18n";
 
 /**
  * Conversión propia de Excel (.xlsx) a HTML: cada hoja con datos es una tabla en su propia
@@ -26,11 +27,11 @@ export function xlsxToHtml(bytes: Uint8Array): OfficeHtml {
   try {
     files = unzipSync(bytes);
   } catch {
-    throw new Error("El archivo no es un libro de Excel válido (.xlsx)");
+    throw new Error(t("El archivo no es un libro de Excel válido (.xlsx)"));
   }
   const read = (name: string) => (files[name] ? parseXml(strFromU8(files[name])) : undefined);
   const workbook = read("xl/workbook.xml");
-  if (!workbook) throw new Error("El archivo no es un libro de Excel válido (.xlsx)");
+  if (!workbook) throw new Error(t("El archivo no es un libro de Excel válido (.xlsx)"));
   const rels = new Map(elements(read("xl/_rels/workbook.xml.rels"), "Relationship").map((r) => [attr(r, "Id")!, attr(r, "Target")!]));
   const shared = elements(read("xl/sharedStrings.xml"), "si").map((si) => decodeXml(elements(si).filter((e) => e.tagName === "t" || e.tagName === "r").map((e) => (e.tagName === "t" ? textOf(e) : textOf(child(e, "t")))).join("")));
   const styles = readStyles(read("xl/styles.xml"));
@@ -48,7 +49,7 @@ export function xlsxToHtml(bytes: Uint8Array): OfficeHtml {
     landscape ||= table.width > A4[0] - 2 * MARGIN;
     chunks.push(table.html.replace("<!--TITLE-->", `<h1>${escapeHtml(decodeXml(attr(sheet, "name") ?? ""))}</h1>`));
   }
-  if (!chunks.length) throw new Error("El libro no tiene datos que convertir");
+  if (!chunks.length) throw new Error(t("El libro no tiene datos que convertir"));
   const [w, h] = landscape ? [A4[1], A4[0]] : A4;
   const css = [
     `@page { margin: ${MARGIN}pt; }`,
@@ -167,7 +168,7 @@ export function formatValue(n: number, fmt: string, date1904 = false): string {
   const clean = section.replace(/\[[^\]]*\]/g, "").replace(/"([^"]*)"/g, "$1").replace(/\\(.)/g, "$1").replace(/_./g, "").replace(/\*./g, "");
   if (/[dmyhs]/i.test(clean.replace(/General/i, "")) && !/0/.test(clean)) return formatDate(n, clean, date1904);
   if (/General/i.test(clean) || !/[0#]/.test(clean)) {
-    return Number.isInteger(n) ? String(n) : n.toLocaleString("es-ES", { maximumFractionDigits: 10, useGrouping: false });
+    return Number.isInteger(n) ? String(n) : n.toLocaleString(locale(), { maximumFractionDigits: 10, useGrouping: false });
   }
   const percent = clean.includes("%");
   const value = (fmt.includes(";") && n < 0 ? -n : n) * (percent ? 100 : 1);
@@ -175,7 +176,7 @@ export function formatValue(n: number, fmt: string, date1904 = false): string {
   const grouping = /[#0],[#0]/.test(clean);
   // "always": en español, por defecto, 1234 no lleva punto de miles (los tipos de TS aún no lo recogen)
   const useGrouping = (grouping ? "always" : false) as unknown as boolean;
-  const number = value.toLocaleString("es-ES", { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping });
+  const number = value.toLocaleString(locale(), { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping });
   // Lo que rodea a la parte numérica (símbolo de moneda, %, texto) se conserva
   const m = clean.match(/^([^0#,.]*)[0#,.]+([^0#,.]*)$/);
   const [before, after] = m ? [m[1], m[2]] : ["", percent ? "%" : ""];

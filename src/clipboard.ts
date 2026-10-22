@@ -1,4 +1,5 @@
 import { readImage, readText } from "@tauri-apps/plugin-clipboard-manager";
+import { t } from "./i18n";
 
 export type Pasted = { kind: "image"; png: Uint8Array; width: number; height: number } | { kind: "text"; text: string };
 
@@ -32,6 +33,6 @@ async function toPng(rgba: Uint8Array, width: number, height: number): Promise<U
   canvas.height = height;
   canvas.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0);
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-  if (!blob) throw new Error("No se pudo convertir la imagen del portapapeles");
+  if (!blob) throw new Error(t("No se pudo convertir la imagen del portapapeles"));
   return new Uint8Array(await blob.arrayBuffer());
 }

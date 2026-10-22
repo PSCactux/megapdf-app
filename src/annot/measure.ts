@@ -1,4 +1,5 @@
 import type { Point } from "../pdf/annotations";
+import { locale } from "../i18n";
 
 /** Medidas a escala: lo que mide `paper` en el papel equivale a `real` en la realidad. */
 export type PaperUnit = "mm" | "cm" | "in";
@@ -38,12 +39,12 @@ export function measureValue(kind: MeasureKind, points: Point[], s: Scale): numb
   return kind === "area" ? areaPt(points) * perPt * perPt : lengthPt(points) * perPt;
 }
 
-/** «12,5 m», «34,25 m²»: hasta dos decimales (uno a partir de 100), a la española. */
+/** «12,5 m», «34,25 m²»: hasta dos decimales (uno a partir de 100), con la puntuación del idioma de la interfaz. */
 export function measureLabel(kind: MeasureKind, points: Point[], s: Scale): string {
   const v = measureValue(kind, points, s);
-  const n = v.toLocaleString("es-ES", { maximumFractionDigits: v >= 100 ? 1 : 2 });
+  const n = v.toLocaleString(locale(), { maximumFractionDigits: v >= 100 ? 1 : 2 });
   return `${n} ${s.realUnit}${kind === "area" ? "²" : ""}`;
 }
 
 /** Escala como texto («1 cm = 100 m»). */
-export const scaleText = (s: Scale) => `${s.paper.toLocaleString("es-ES")} ${s.paperUnit} = ${s.real.toLocaleString("es-ES")} ${s.realUnit}`;
+export const scaleText = (s: Scale) => `${s.paper.toLocaleString(locale())} ${s.paperUnit} = ${s.real.toLocaleString(locale())} ${s.realUnit}`;

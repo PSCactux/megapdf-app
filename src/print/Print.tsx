@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { parseRanges } from "../pdf/pages";
 import { type PrintLayout, printSheets } from "./sheets";
+import { t, tk } from "../i18n";
 
 /** Resolución de las páginas que se mandan a imprimir. */
 export const PRINT_DPI = 200;
@@ -10,10 +11,10 @@ export const PRINT_DPI = 200;
 type DialogProps = { pageCount: number; current: number; onPrint: (pages: number[], layout: PrintLayout) => Promise<void>; onCancel: () => void };
 
 const LAYOUTS: [PrintLayout, string][] = [
-  ["1", "Una página por hoja"],
-  ["2", "Dos por hoja (apaisado)"],
-  ["4", "Cuatro por hoja"],
-  ["booklet", "Folleto (doble cara, doblado por la mitad)"],
+  ["1", tk("Una página por hoja")],
+  ["2", tk("Dos por hoja (apaisado)")],
+  ["4", tk("Cuatro por hoja")],
+  ["booklet", tk("Folleto (doble cara, doblado por la mitad)")],
 ];
 
 export function PrintDialog({ pageCount, current, onPrint, onCancel }: DialogProps) {
@@ -32,7 +33,7 @@ export function PrintDialog({ pageCount, current, onPrint, onCancel }: DialogPro
     <div className="modal-backdrop">
       <form
         className="modal"
-        aria-label="Imprimir"
+        aria-label={t("Imprimir")}
         onSubmit={async (e) => {
           e.preventDefault();
           if (problem) return;
@@ -44,44 +45,45 @@ export function PrintDialog({ pageCount, current, onPrint, onCancel }: DialogPro
           }
         }}
       >
-        <h2>Imprimir</h2>
+        <h2>{t("Imprimir")}</h2>
         <label className="radio">
           <input type="radio" checked={scope === "all"} onChange={() => setScope("all")} />
-          Todas las páginas ({pageCount})
+          {t("Todas las páginas ({n})", { n: pageCount })}
         </label>
         <label className="radio">
           <input type="radio" checked={scope === "current"} onChange={() => setScope("current")} />
-          Página actual ({current + 1})
+          {t("Página actual ({n})", { n: current + 1 })}
         </label>
         <label className="radio">
           <input type="radio" checked={scope === "range"} onChange={() => setScope("range")} />
-          Páginas
-          <input value={range} placeholder="Ej.: 1-3, 5" onChange={(e) => setRange(e.target.value)} onFocus={() => setScope("range")} aria-label="Rango de páginas" />
+          {t("Páginas")}
+          <input value={range} placeholder={t("Ej.: 1-3, 5")} onChange={(e) => setRange(e.target.value)} onFocus={() => setScope("range")} aria-label={t("Rango de páginas")} />
         </label>
         {problem && scope === "range" && range && <p className="error-text">{problem}</p>}
         <label className="prop">
-          Páginas por hoja
+          {t("Páginas por hoja")}
           <select id="print-layout" value={layout} onChange={(e) => setLayout(e.target.value as PrintLayout)}>
             {LAYOUTS.map(([k, label]) => (
               <option key={k} value={k}>
-                {label}
+                {t(label)}
               </option>
             ))}
           </select>
         </label>
         {layout === "booklet" && (
           <p className="hint">
-            Imprime a doble cara girando por el borde corto, dobla el taco por la mitad y grápalo: {printSheets(pages, "booklet").length / 2}{" "}
-            {printSheets(pages, "booklet").length / 2 === 1 ? "hoja" : "hojas"}.
+            {printSheets(pages, "booklet").length / 2 === 1
+              ? t("Imprime a doble cara girando por el borde corto, dobla el taco por la mitad y grápalo: {n} hoja.", { n: 1 })
+              : t("Imprime a doble cara girando por el borde corto, dobla el taco por la mitad y grápalo: {n} hojas.", { n: printSheets(pages, "booklet").length / 2 })}
           </p>
         )}
-        <p className="hint">Después se abre el diálogo de impresión del sistema, donde se eligen la impresora, las copias y el papel.</p>
+        <p className="hint">{t("Después se abre el diálogo de impresión del sistema, donde se eligen la impresora, las copias y el papel.")}</p>
         <div className="modal-actions">
           <button type="button" onClick={onCancel}>
-            Cancelar
+            {t("Cancelar")}
           </button>
           <button type="submit" className="primary" disabled={busy || !!problem || !pages.length}>
-            {busy ? "Preparando…" : "Imprimir…"}
+            {busy ? t("Preparando…") : t("Imprimir…")}
           </button>
         </div>
       </form>
@@ -123,12 +125,12 @@ export function PrintView({ images, layout, onDone }: { images: Uint8Array[]; la
       {/* Dos por hoja y folleto van en apaisado */}
       {(layout === "2" || layout === "booklet") && <style>{"@media print { @page { size: landscape; } }"}</style>}
       {layout === "1"
-        ? urls.map((u, i) => <img key={i} src={u} alt={`Página ${i + 1}`} />)
+        ? urls.map((u, i) => <img key={i} src={u} alt={t("Página {n}", { n: i + 1 })} />)
         : sheets.map((sheet, s) => (
             <div key={s} className="print-sheet">
               {sheet.map((i, k) => (
                 <div key={k} className="print-cell">
-                  {i !== null && <img src={urls[i]} alt={`Página ${i + 1}`} />}
+                  {i !== null && <img src={urls[i]} alt={t("Página {n}", { n: i + 1 })} />}
                 </div>
               ))}
             </div>

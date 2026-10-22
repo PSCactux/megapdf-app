@@ -1,9 +1,10 @@
 import type { Engine } from "./engine";
 import type { WorkerRequest, WorkerResponse } from "./worker";
+import { t } from "../i18n";
 
 type Api = Pick<
   Engine,
-  | "open" | "unlock" | "info" | "render" | "search" | "save" | "markSaved" | "close"
+  | "open" | "unlock" | "setLanguage" | "info" | "render" | "search" | "save" | "markSaved" | "close"
   | "annotations" | "addAnnotation" | "updateAnnotation" | "deleteAnnotation"
   | "history" | "undo" | "redo" | "selectText"
   | "rotatePages" | "deletePages" | "movePages" | "insertBlankPage" | "insertPdf" | "insertImages" | "extractPages" | "merge" | "needsPassword" | "decryptPdf" | "addTexts" | "findText" | "replaceText" | "formData" | "formDataOf" | "fillForm" | "fillCopies" | "exportXfdf" | "fillFormXfdf" | "suggestBookmarks" | "addBookmarksFromHeadings" | "searchFile" | "commentsSummary" | "replyToAnnotation" | "setAnnotationState" | "editReply" | "pdfPageCount" | "pageText" | "duplicatePages" | "replacePages" | "cropPages" | "uncropPages" | "cropWhiteMargins" | "croppedPages" | "whiteMargins" | "properties" | "setProperties" | "attachments" | "attachmentContents" | "addAttachment" | "removeAttachment" | "embeddedImages" | "links" | "addLink" | "updateLink" | "removeLink" | "addBookmark" | "renameBookmark" | "deleteBookmark" | "moveBookmark"
@@ -34,7 +35,7 @@ class PdfClient {
       else p.resolve(msg.result);
     };
     this.worker.onerror = (e) => {
-      const err = new Error(`El motor PDF ha fallado: ${e.message}`);
+      const err = new Error(t("El motor PDF ha fallado: {error}", { error: e.message }));
       for (const p of this.pending.values()) p.reject(err);
       this.pending.clear();
     };

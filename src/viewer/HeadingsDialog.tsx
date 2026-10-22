@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { pdf } from "../pdf/client";
 import type { Heading } from "../pdf/headings";
+import { t } from "../i18n";
 
 type Props = {
   docId: string;
@@ -19,7 +20,7 @@ export function HeadingsDialog({ docId, hasOutline, onCreate, onClose, onError }
     pdf.call("suggestBookmarks", [docId]).then(
       (h) => setItems(h.map((x) => ({ ...x, on: true }))),
       (e) => {
-        onError(`No se pudieron buscar los títulos: ${e instanceof Error ? e.message : e}`);
+        onError(t("No se pudieron buscar los títulos: {error}", { error: e instanceof Error ? e.message : String(e) }));
         onClose();
       },
     );
@@ -28,15 +29,15 @@ export function HeadingsDialog({ docId, hasOutline, onCreate, onClose, onError }
   const set = (k: number, patch: Partial<Heading & { on: boolean }>) => setItems(items!.map((x, i) => (i === k ? { ...x, ...patch } : x)));
   return (
     <div className="modal-backdrop">
-      <div className="modal modal-wide" role="dialog" aria-label="Marcadores desde los títulos">
-        <h2>Marcadores desde los títulos</h2>
+      <div className="modal modal-wide" role="dialog" aria-label={t("Marcadores desde los títulos")}>
+        <h2>{t("Marcadores desde los títulos")}</h2>
         {!items ? (
-          <p className="muted">Buscando títulos…</p>
+          <p className="muted">{t("Buscando títulos…")}</p>
         ) : items.length === 0 ? (
-          <p className="muted">No se han encontrado títulos: el documento no tiene texto en letra más grande o en negrita (si es escaneado, pásale antes el OCR).</p>
+          <p className="muted">{t("No se han encontrado títulos: el documento no tiene texto en letra más grande o en negrita (si es escaneado, pásale antes el OCR).")}</p>
         ) : (
           <>
-            <p className="hint">Quita los que no sean títulos y ajusta el nivel si hace falta.</p>
+            <p className="hint">{t("Quita los que no sean títulos y ajusta el nivel si hace falta.")}</p>
             <ul className="hit-list headings-list">
               {items.map((h, k) => (
                 <li key={k} style={{ paddingLeft: (h.level - 1) * 18 }}>
@@ -44,11 +45,11 @@ export function HeadingsDialog({ docId, hasOutline, onCreate, onClose, onError }
                     <input type="checkbox" checked={h.on} onChange={(e) => set(k, { on: e.target.checked })} />
                     <span>{h.title}</span>
                   </label>
-                  <span className="muted">p. {h.page + 1}</span>
-                  <select aria-label={`Nivel de «${h.title}»`} value={h.level} onChange={(e) => set(k, { level: Number(e.target.value) })}>
+                  <span className="muted">{t("p. {page}", { page: h.page + 1 })}</span>
+                  <select aria-label={t("Nivel de «{title}»", { title: h.title })} value={h.level} onChange={(e) => set(k, { level: Number(e.target.value) })}>
                     {[1, 2, 3].map((l) => (
                       <option key={l} value={l}>
-                        Nivel {l}
+                        {t("Nivel {level}", { level: l })}
                       </option>
                     ))}
                   </select>
@@ -58,13 +59,13 @@ export function HeadingsDialog({ docId, hasOutline, onCreate, onClose, onError }
             {hasOutline && (
               <label className="check">
                 <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
-                Sustituir los marcadores que ya tiene
+                {t("Sustituir los marcadores que ya tiene")}
               </label>
             )}
           </>
         )}
         <div className="modal-actions">
-          <button onClick={onClose}>Cancelar</button>
+          <button onClick={onClose}>{t("Cancelar")}</button>
           <button
             className="primary"
             disabled={!chosen.length}
@@ -72,7 +73,7 @@ export function HeadingsDialog({ docId, hasOutline, onCreate, onClose, onError }
               if (await onCreate(chosen.map(({ title, page, level }) => ({ title, page, level })), replace)) onClose();
             }}
           >
-            Crear {chosen.length} {chosen.length === 1 ? "marcador" : "marcadores"}
+            {chosen.length === 1 ? t("Crear {n} marcador", { n: chosen.length }) : t("Crear {n} marcadores", { n: chosen.length })}
           </button>
         </div>
       </div>

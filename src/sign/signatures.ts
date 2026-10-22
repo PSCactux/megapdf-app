@@ -1,5 +1,7 @@
 /** Firmas manuscritas guardadas en este equipo (comodidad personal, no se comparten). */
 
+import { t } from "../i18n";
+
 export type HandSignature = { id: string; dataUrl: string; width: number; height: number };
 
 const KEY = "megapdf.signatures";
@@ -20,7 +22,7 @@ export function saveSignature(sig: HandSignature): HandSignature[] {
   try {
     localStorage.setItem(KEY, JSON.stringify(list));
   } catch {
-    throw new Error("No se pudo guardar la firma en este equipo");
+    throw new Error(t("No se pudo guardar la firma en este equipo"));
   }
   return list;
 }
@@ -30,7 +32,7 @@ export function deleteSaved(id: string): HandSignature[] {
   try {
     localStorage.setItem(KEY, JSON.stringify(list));
   } catch {
-    throw new Error("No se pudo borrar la firma guardada");
+    throw new Error(t("No se pudo borrar la firma guardada"));
   }
   return list;
 }

@@ -3,6 +3,7 @@ import type { PageSize } from "../pdf/engine";
 import type { Change } from "../pdf/compare";
 import { PageCanvas } from "../viewer/PageCanvas";
 import { GAP, placePages, renderScale, visibleRange } from "../viewer/layout";
+import { t } from "../i18n";
 
 type Props = {
   /** Documento de la versión anterior, abierto en el motor mientras se compara. */
@@ -36,9 +37,9 @@ export function OldVersionPane({ docId, name, pages, changes, active, target }: 
   const [first, last] = visibleRange(offsets, view.top, view.height);
 
   return (
-    <section className="compare-old" aria-label="Versión anterior">
+    <section className="compare-old" aria-label={t("Versión anterior")}>
       <div className="compare-old-head">
-        Versión anterior: <strong>{name}</strong>
+        {t("Versión anterior:")} <strong>{name}</strong>
       </div>
       <div className="compare-old-pages" ref={ref} onScroll={(e) => {
           const top = e.currentTarget.scrollTop;
@@ -59,7 +60,7 @@ export function OldVersionPane({ docId, name, pages, changes, active, target }: 
                           <div
                             key={`${ci}-${k}`}
                             className={`diff diff-old-${c.kind} ${ci === active ? "is-active" : ""}`}
-                            title={c.kind === "removed" ? "Quitado en la versión actual" : `Ahora: ${c.text}`}
+                            title={c.kind === "removed" ? t("Quitado en la versión actual") : t("Ahora: {text}", { text: c.text })}
                             style={{ left: r[0] * zoom, top: r[1] * zoom, width: (r[2] - r[0]) * zoom, height: (r[3] - r[1]) * zoom }}
                           />
                         )),

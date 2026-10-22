@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { CompressPreset } from "../pdf/security";
 import { type BatchResult, type BatchSteps, processFile } from "./batch";
 import { dirName, fileName, pickFolder, pickPdfs } from "../files";
+import { t } from "../i18n";
 
 type Props = { onClose: () => void };
 
@@ -19,7 +20,7 @@ export function BatchDialog({ onClose }: Props) {
   const [password, setPassword] = useState<string | null>(null);
   const [outputs, setOutputs] = useState({ pdf: true, docx: false, xlsx: false, txt: false });
   const [folder, setFolder] = useState<string | null>(null);
-  const [suffix, setSuffix] = useState(" (procesado)");
+  const [suffix, setSuffix] = useState(() => t(" (procesado)"));
   const [status, setStatus] = useState<{ index: number; text: string } | null>(null);
   const [results, setResults] = useState<BatchResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,19 +42,19 @@ export function BatchDialog({ onClose }: Props) {
   const anyOutput = Object.values(outputs).some(Boolean);
   const sameFolder = !!folder && files.some((f) => dirName(f) === folder);
   const problem = !files.length
-    ? "Añade los archivos que quieres procesar."
+    ? t("Añade los archivos que quieres procesar.")
     : !anyStep && !outputs.docx && !outputs.xlsx && !outputs.txt
-      ? "Elige al menos un paso o una conversión."
+      ? t("Elige al menos un paso o una conversión.")
       : !anyOutput
-        ? "Elige qué se guarda."
+        ? t("Elige qué se guarda.")
         : !folder
-          ? "Elige la carpeta donde se guardan los resultados."
+          ? t("Elige la carpeta donde se guardan los resultados.")
           : sameFolder && !suffix.trim()
-            ? "Es la carpeta de los originales: añade algo al nombre para no sustituirlos."
+            ? t("Es la carpeta de los originales: añade algo al nombre para no sustituirlos.")
             : watermark !== null && !watermark.trim()
-              ? "Escribe el texto de la marca de agua."
+              ? t("Escribe el texto de la marca de agua.")
               : password !== null && password.length < 4
-                ? "La contraseña debe tener al menos 4 caracteres."
+                ? t("La contraseña debe tener al menos 4 caracteres.")
                 : null;
 
   async function run() {
@@ -65,7 +66,7 @@ export function BatchDialog({ onClose }: Props) {
     const done: BatchResult[] = [];
     for (const [i, path] of files.entries()) {
       if (cancelled.current) break;
-      setStatus({ index: i, text: "Empezando…" });
+      setStatus({ index: i, text: t("Empezando…") });
       const r = await processFile(path, steps, nextBates, (text) => setStatus({ index: i, text }), () => cancelled.current);
       nextBates = r.nextBates;
       done.push(r.result);
@@ -88,17 +89,17 @@ export function BatchDialog({ onClose }: Props) {
 
   return (
     <div className="modal-backdrop">
-      <div className="modal modal-wide batch" role="dialog" aria-label="Procesar varios archivos">
-        <h2>Procesar varios archivos</h2>
+      <div className="modal modal-wide batch" role="dialog" aria-label={t("Procesar varios archivos")}>
+        <h2>{t("Procesar varios archivos")}</h2>
         <div className="batch-cols">
           <section>
-            <h3>1. Archivos</h3>
+            <h3>{t("1. Archivos")}</h3>
             <div className="props-row">
               <button disabled={running} onClick={async () => add(await pickPdfs())}>
-                Añadir archivos…
+                {t("Añadir archivos…")}
               </button>
               <button disabled={running} onClick={addFolder}>
-                Añadir una carpeta…
+                {t("Añadir una carpeta…")}
               </button>
             </div>
             {files.length > 0 ? (
@@ -112,7 +113,7 @@ export function BatchDialog({ onClose }: Props) {
                         {fileName(f)}
                       </span>
                       {!running && !results && (
-                        <button onClick={() => setFiles(files.filter((x) => x !== f))} aria-label={`Quitar ${fileName(f)}`} title="Quitar">
+                        <button onClick={() => setFiles(files.filter((x) => x !== f))} aria-label={t("Quitar {name}", { name: fileName(f) })} title={t("Quitar")}>
                           ×
                         </button>
                       )}
@@ -121,61 +122,61 @@ export function BatchDialog({ onClose }: Props) {
                 })}
               </ol>
             ) : (
-              <p className="empty-list">Todavía no hay archivos.</p>
+              <p className="empty-list">{t("Todavía no hay archivos.")}</p>
             )}
           </section>
           <section>
-            <h3>2. Qué hacer a cada uno</h3>
-            {check("Reconocer el texto de las páginas escaneadas (OCR)", ocr, setOcr)}
+            <h3>{t("2. Qué hacer a cada uno")}</h3>
+            {check(t("Reconocer el texto de las páginas escaneadas (OCR)"), ocr, setOcr)}
             {check(
-              "Marca de agua",
+              t("Marca de agua"),
               watermark !== null,
-              (on) => setWatermark(on ? "CONFIDENCIAL" : null),
-              <input aria-label="Texto de la marca de agua" value={watermark ?? ""} disabled={running} onChange={(e) => setWatermark(e.target.value)} />,
+              (on) => setWatermark(on ? t("CONFIDENCIAL") : null),
+              <input aria-label={t("Texto de la marca de agua")} value={watermark ?? ""} disabled={running} onChange={(e) => setWatermark(e.target.value)} />,
             )}
-            {check("Numerar las páginas («Página 1 de 5» abajo)", pageNumbers, setPageNumbers)}
+            {check(t("Numerar las páginas («Página 1 de 5» abajo)"), pageNumbers, setPageNumbers)}
             {check(
-              "Numeración Bates (sigue de un archivo al siguiente)",
+              t("Numeración Bates (sigue de un archivo al siguiente)"),
               bates !== null,
               (on) => setBates(on ? { prefix: "DOC-", start: 1, digits: 6 } : null),
               bates && (
                 <div className="props-row">
-                  <input aria-label="Prefijo Bates" value={bates.prefix} disabled={running} onChange={(e) => setBates({ ...bates, prefix: e.target.value })} style={{ width: 90 }} />
+                  <input aria-label={t("Prefijo Bates")} value={bates.prefix} disabled={running} onChange={(e) => setBates({ ...bates, prefix: e.target.value })} style={{ width: 90 }} />
                   <label>
-                    desde{" "}
-                    <input aria-label="Primer número Bates" type="number" min={1} value={bates.start} disabled={running} onChange={(e) => setBates({ ...bates, start: Math.max(1, Number(e.target.value) || 1) })} style={{ width: 80 }} />
+                    {t("desde")}{" "}
+                    <input aria-label={t("Primer número Bates")} type="number" min={1} value={bates.start} disabled={running} onChange={(e) => setBates({ ...bates, start: Math.max(1, Number(e.target.value) || 1) })} style={{ width: 80 }} />
                   </label>
                 </div>
               ),
             )}
-            {check("Aplanar los formularios", flatten, setFlatten)}
-            {check("Quitar información oculta (metadatos, adjuntos, JavaScript)", clean, setClean)}
+            {check(t("Aplanar los formularios"), flatten, setFlatten)}
+            {check(t("Quitar información oculta (metadatos, adjuntos, JavaScript)"), clean, setClean)}
             {check(
-              "Reducir el tamaño",
+              t("Reducir el tamaño"),
               compress !== null,
               (on) => setCompress(on ? "medium" : null),
-              <select aria-label="Calidad" value={compress ?? "medium"} disabled={running} onChange={(e) => setCompress(e.target.value as CompressPreset)}>
-                <option value="high">Alta (200 ppp)</option>
-                <option value="medium">Media (150 ppp)</option>
-                <option value="low">Baja (100 ppp)</option>
+              <select aria-label={t("Calidad")} value={compress ?? "medium"} disabled={running} onChange={(e) => setCompress(e.target.value as CompressPreset)}>
+                <option value="high">{t("Alta (200 ppp)")}</option>
+                <option value="medium">{t("Media (150 ppp)")}</option>
+                <option value="low">{t("Baja (100 ppp)")}</option>
               </select>,
             )}
             {check(
-              "Proteger con contraseña de apertura",
+              t("Proteger con contraseña de apertura"),
               password !== null,
               (on) => setPassword(on ? "" : null),
-              <input aria-label="Contraseña" type="password" value={password ?? ""} disabled={running} onChange={(e) => setPassword(e.target.value)} placeholder="La misma para todos" />,
+              <input aria-label={t("Contraseña")} type="password" value={password ?? ""} disabled={running} onChange={(e) => setPassword(e.target.value)} placeholder={t("La misma para todos")} />,
             )}
           </section>
           <section>
-            <h3>3. Qué guardar y dónde</h3>
+            <h3>{t("3. Qué guardar y dónde")}</h3>
             <div className="batch-outputs">
               {(
                 [
                   ["pdf", "PDF"],
                   ["docx", "Word"],
                   ["xlsx", "Excel"],
-                  ["txt", "Texto"],
+                  ["txt", t("Texto")],
                 ] as const
               ).map(([k, label]) => (
                 <label key={k} className="check">
@@ -186,7 +187,7 @@ export function BatchDialog({ onClose }: Props) {
             </div>
             <div className="props-row">
               <button disabled={running} onClick={async () => setFolder((await pickFolder()) ?? folder)}>
-                {folder ? "Cambiar carpeta…" : "Elegir carpeta…"}
+                {folder ? t("Cambiar carpeta…") : t("Elegir carpeta…")}
               </button>
               {folder && (
                 <span className="muted folder-path" title={folder}>
@@ -195,8 +196,8 @@ export function BatchDialog({ onClose }: Props) {
               )}
             </div>
             <label className="prop">
-              Añadir al nombre
-              <input id="batch-suffix" value={suffix} disabled={running} onChange={(e) => setSuffix(e.target.value)} placeholder="Nada: mismo nombre" />
+              {t("Añadir al nombre")}
+              <input id="batch-suffix" value={suffix} disabled={running} onChange={(e) => setSuffix(e.target.value)} placeholder={t("Nada: mismo nombre")} />
             </label>
           </section>
         </div>
@@ -204,15 +205,20 @@ export function BatchDialog({ onClose }: Props) {
           <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={files.length} aria-valuenow={status.index}>
             <div style={{ width: `${(100 * status.index) / Math.max(1, files.length)}%` }} />
             <span>
-              {status.index + 1} de {files.length}: {fileName(files[status.index])} · {status.text}
+              {t("{n} de {total}: {file} · {status}", { n: status.index + 1, total: files.length, file: fileName(files[status.index]), status: status.text })}
             </span>
           </div>
         )}
         {results && !running && results.length > 0 && (
           <div className="batch-report">
             <p>
-              {ok} de {results.length} {results.length === 1 ? "archivo procesado" : "archivos procesados"}
-              {ok ? ` en ${folder}.` : "."}
+              {results.length === 1
+                ? ok
+                  ? t("{ok} de {total} archivo procesado en {folder}.", { ok, total: results.length, folder: folder ?? "" })
+                  : t("{ok} de {total} archivo procesado.", { ok, total: results.length })
+                : ok
+                  ? t("{ok} de {total} archivos procesados en {folder}.", { ok, total: results.length, folder: folder ?? "" })
+                  : t("{ok} de {total} archivos procesados.", { ok, total: results.length })}
             </p>
             <ul>
               {results.map((r) => (
@@ -227,17 +233,17 @@ export function BatchDialog({ onClose }: Props) {
         {problem && !running && !results && files.length > 0 && <p className="hint">{problem}</p>}
         <div className="modal-actions">
           {running ? (
-            <button onClick={() => (cancelled.current = true)}>Parar después de este archivo</button>
+            <button onClick={() => (cancelled.current = true)}>{t("Parar después de este archivo")}</button>
           ) : (
-            <button onClick={onClose}>Cerrar</button>
+            <button onClick={onClose}>{t("Cerrar")}</button>
           )}
           {results && !running ? (
             <button className="primary" onClick={() => setResults(null)}>
-              Volver a empezar
+              {t("Volver a empezar")}
             </button>
           ) : (
             <button className="primary" disabled={!!problem || running} onClick={run}>
-              Procesar {files.length || ""} {files.length === 1 ? "archivo" : "archivos"}
+              {!files.length ? t("Procesar archivos") : files.length === 1 ? t("Procesar 1 archivo") : t("Procesar {n} archivos", { n: files.length })}
             </button>
           )}
         </div>

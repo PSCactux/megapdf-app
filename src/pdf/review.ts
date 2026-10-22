@@ -1,5 +1,6 @@
 import * as mupdf from "mupdf";
 import { safeDate } from "./annotations";
+import { t } from "../i18n";
 
 /**
  * Revisión de comentarios como la hace Acrobat (y la entienden Reader, Foxit y compañía):
@@ -49,7 +50,7 @@ export function readStatus(annot: mupdf.PDFAnnotation): { model: string; state: 
 
 /** Responde a un comentario. */
 export function addReply(page: mupdf.PDFPage, parent: mupdf.PDFAnnotation, text: string, author: string): mupdf.PDFAnnotation {
-  if (!text.trim()) throw new Error("La respuesta está vacía");
+  if (!text.trim()) throw new Error(t("La respuesta está vacía"));
   const reply = hiddenNote(page, parent, author);
   reply.setContents(text.trim());
   hide(reply);
@@ -69,7 +70,7 @@ export function setState(doc: mupdf.PDFDocument, page: mupdf.PDFPage, parent: mu
 
 /** Cambia el texto de una respuesta sin que vuelva a dibujarse en la página. */
 export function editReply(reply: mupdf.PDFAnnotation, text: string) {
-  if (!text.trim()) throw new Error("La respuesta está vacía");
+  if (!text.trim()) throw new Error(t("La respuesta está vacía"));
   reply.setContents(text.trim());
   reply.setModificationDate(new Date());
   hide(reply);

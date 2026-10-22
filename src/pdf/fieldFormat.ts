@@ -1,3 +1,4 @@
+import { getLang, t } from "../i18n";
 /**
  * Formatos de los campos de texto, compatibles con Acrobat: se guardan como sus scripts estándar
  * (AFNumber_Format, AFPercent_Format, AFDate_FormatEx) para que Acrobat y Reader los apliquen, y
@@ -73,10 +74,10 @@ export function parseInput(f: FieldFormat | null, input: string): { raw: string 
   if (!f || !text) return { raw: text };
   if (f.kind === "date") {
     const date = parseDate(text, f.pattern);
-    return date ? { raw: formatDate(date, f.pattern) } : { error: `Escribe una fecha válida (${f.pattern.replace(/y/g, "a")})` };
+    return date ? { raw: formatDate(date, f.pattern) } : { error: t("Escribe una fecha válida ({formato})", { formato: getLang() === "en" ? f.pattern : f.pattern.replace(/y/g, "a") }) };
   }
   const n = parseNumber(text);
-  if (n === null) return { error: f.kind === "percent" ? "Escribe un porcentaje (p. ej. 15 o 12,5)" : "Escribe un número (p. ej. 1.234,50)" };
+  if (n === null) return { error: f.kind === "percent" ? t("Escribe un porcentaje (p. ej. 15 o 12,5)") : t("Escribe un número (p. ej. 1.234,50)") };
   // Se redondea a los decimales del formato; un porcentaje se guarda como fracción (15 % → 0.15)
   const rounded = Number(n.toFixed(f.decimals));
   return { raw: String(f.kind === "percent" ? Number((rounded / 100).toFixed(f.decimals + 2)) : rounded) };

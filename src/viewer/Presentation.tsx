@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { PageSize } from "../pdf/engine";
 import { PageCanvas } from "./PageCanvas";
 import { renderScale } from "./layout";
+import { t } from "../i18n";
 
 type Props = {
   docId: string;
@@ -21,14 +22,14 @@ export function Presentation({ docId, pages, start, onExit, onError }: Props) {
 
   useEffect(() => {
     const win = getCurrentWindow();
-    win.setFullscreen(true).catch((e) => onError(`No se pudo poner la pantalla completa: ${e instanceof Error ? e.message : e}`));
+    win.setFullscreen(true).catch((e) => onError(t("No se pudo poner la pantalla completa: {error}", { error: e instanceof Error ? e.message : String(e) })));
     const onResize = () => setScreen({ width: window.innerWidth, height: window.innerHeight });
     window.addEventListener("resize", onResize);
     const timer = setTimeout(() => setHint(false), 2500);
     return () => {
       window.removeEventListener("resize", onResize);
       clearTimeout(timer);
-      win.setFullscreen(false).catch((e) => onError(`No se pudo salir de la pantalla completa: ${e instanceof Error ? e.message : e}`));
+      win.setFullscreen(false).catch((e) => onError(t("No se pudo salir de la pantalla completa: {error}", { error: e instanceof Error ? e.message : String(e) })));
     };
   }, []);
 
@@ -55,7 +56,7 @@ export function Presentation({ docId, pages, start, onExit, onError }: Props) {
     <div
       className="presentation"
       role="dialog"
-      aria-label="Presentación"
+      aria-label={t("Presentación")}
       onClick={(e) => setPage((p) => Math.max(0, Math.min(pages.length - 1, p + (e.clientX < screen.width / 4 ? -1 : 1))))}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -66,7 +67,7 @@ export function Presentation({ docId, pages, start, onExit, onError }: Props) {
         <PageCanvas docId={docId} index={page} scale={renderScale(size, zoom, devicePixelRatio)} width={w} height={h} />
       </div>
       <div className={`presentation-hint ${hint ? "is-visible" : ""}`}>
-        {page + 1} / {pages.length} · ← → para pasar · Esc para salir
+        {page + 1} / {pages.length} · {t("← → para pasar · Esc para salir")}
       </div>
     </div>
   );

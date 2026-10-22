@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { isAbort, pdf } from "../pdf/client";
+import { t } from "../i18n";
 
 /** `revision` cambia cuando el documento se modifica y hay que volver a pintar. */
 type Props = { docId: string; index: number; scale: number; width: number; height: number; revision?: number };
@@ -30,7 +31,7 @@ export function PageCanvas({ docId, index, scale, width, height, revision = 0 }:
   return (
     <>
       <canvas ref={ref} className="page-canvas" style={{ width, height }} />
-      {error && <div className="page-error">No se pudo mostrar la página: {error}</div>}
+      {error && <div className="page-error">{t("No se pudo mostrar la página: {error}", { error })}</div>}
     </>
   );
 }

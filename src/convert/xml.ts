@@ -1,4 +1,5 @@
 import { parse } from "txml";
+import { t } from "../i18n";
 
 /** Nodo XML tal como lo devuelve txml. */
 export type XNode = { tagName: string; attributes: Record<string, string | null>; children: (XNode | string)[] };
@@ -6,7 +7,7 @@ export type XNode = { tagName: string; attributes: Record<string, string | null>
 export function parseXml(xml: string): XNode {
   const nodes = parse(xml, { keepWhitespace: true }) as (XNode | string)[];
   const root = nodes.find((n): n is XNode => typeof n !== "string" && !n.tagName.startsWith("?") && !n.tagName.startsWith("!"));
-  if (!root) throw new Error("XML vacío o no válido");
+  if (!root) throw new Error(t("XML vacío o no válido"));
   return root;
 }
 

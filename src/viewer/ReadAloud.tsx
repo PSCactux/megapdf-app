@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { pdf } from "../pdf/client";
+import { getLang, locale, t } from "../i18n";
 
 type Props = {
   docId: string;
@@ -25,7 +26,7 @@ export function ReadAloud({ docId, pageCount, start, onPage, onClose, onError }:
   const synth = typeof window !== "undefined" ? window.speechSynthesis : undefined;
 
   async function readFrom(p: number, speed = rate) {
-    if (!synth) return onError("Este equipo no tiene voz para leer en voz alta.");
+    if (!synth) return onError(t("Este equipo no tiene voz para leer en voz alta."));
     const id = ++run.current;
     synth.cancel();
     for (let i = p; i < pageCount; i++) {
@@ -36,10 +37,10 @@ export function ReadAloud({ docId, pageCount, start, onPage, onClose, onError }:
       try {
         text = await pdf.call("pageText", [docId, i]);
       } catch (e) {
-        return onError(`No se pudo leer la página ${i + 1}: ${e instanceof Error ? e.message : e}`);
+        return onError(t("No se pudo leer la página {page}: {error}", { page: i + 1, error: e instanceof Error ? e.message : String(e) }));
       }
       if (!text.trim()) {
-        setNote(`La página ${i + 1} no tiene texto (si es escaneada, pásale antes el OCR).`);
+        setNote(t("La página {page} no tiene texto (si es escaneada, pásale antes el OCR).", { page: i + 1 }));
         continue;
       }
       setNote(null);
@@ -60,8 +61,8 @@ export function ReadAloud({ docId, pageCount, start, onPage, onClose, onError }:
   }, []);
 
   return (
-    <div className="read-aloud" role="region" aria-label="Leer en voz alta">
-      <span className="muted">🔊 Página {page + 1}</span>
+    <div className="read-aloud" role="region" aria-label={t("Leer en voz alta")}>
+      <span className="muted">{t("🔊 Página {page}", { page: page + 1 })}</span>
       {state === "reading" ? (
         <button
           onClick={() => {
@@ -69,7 +70,7 @@ export function ReadAloud({ docId, pageCount, start, onPage, onClose, onError }:
             setState("paused");
           }}
         >
-          Pausa
+          {t("Pausa")}
         </button>
       ) : state === "paused" ? (
         <button
@@ -78,7 +79,7 @@ export function ReadAloud({ docId, pageCount, start, onPage, onClose, onError }:
             setState("reading");
           }}
         >
-          Seguir
+          {t("Seguir")}
         </button>
       ) : (
         <button
@@ -87,18 +88,18 @@ export function ReadAloud({ docId, pageCount, start, onPage, onClose, onError }:
             readFrom(0);
           }}
         >
-          Volver a empezar
+          {t("Volver a empezar")}
         </button>
       )}
-      <button disabled={page === 0} onClick={() => (setState("reading"), readFrom(page - 1))} title="Página anterior">
+      <button disabled={page === 0} onClick={() => (setState("reading"), readFrom(page - 1))} title={t("Página anterior")}>
         ⏮
       </button>
-      <button disabled={page >= pageCount - 1} onClick={() => (setState("reading"), readFrom(page + 1))} title="Página siguiente">
+      <button disabled={page >= pageCount - 1} onClick={() => (setState("reading"), readFrom(page + 1))} title={t("Página siguiente")}>
         ⏭
       </button>
       <select
         value={rate}
-        aria-label="Velocidad"
+        aria-label={t("Velocidad")}
         onChange={(e) => {
           const r = Number(e.target.value);
           setRate(r);
@@ -110,12 +111,12 @@ export function ReadAloud({ docId, pageCount, start, onPage, onClose, onError }:
       >
         {RATES.map((r) => (
           <option key={r} value={r}>
-            {String(r).replace(".", ",")}×
+            {r.toLocaleString(locale())}×
           </option>
         ))}
       </select>
       {note && <span className="muted">{note}</span>}
-      <button onClick={onClose} aria-label="Dejar de leer" title="Dejar de leer">
+      <button onClick={onClose} aria-label={t("Dejar de leer")} title={t("Dejar de leer")}>
         ✕
       </button>
     </div>
@@ -142,7 +143,10 @@ export function chunks(text: string, max = 200): string[] {
 function speak(synth: SpeechSynthesis, text: string, rate: number): Promise<void> {
   return new Promise((resolve) => {
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = document.documentElement.lang || "es-ES";
+    // Voz del idioma de la interfaz, si el sistema tiene alguna
+    u.lang = locale();
+    const voice = synth.getVoices?.().find((v) => v.lang.toLowerCase().startsWith(getLang()));
+    if (voice) u.voice = voice;
     u.rate = rate;
     // Si se cancela (parar, saltar) también termina: la lectura comprueba si sigue siendo la actual
     u.onend = () => resolve();

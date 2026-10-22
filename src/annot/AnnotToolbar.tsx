@@ -5,6 +5,7 @@ import { FILL_TOOLS, FONT_SIZES, MEASURE_TOOLS, PALETTE, TEXT_MARKUP, TOOLS, typ
 import { scaleText } from "./measure";
 import type { ToolOptions } from "./PageOverlay";
 import { type StampChoice, stampKey, stampName } from "./customStamps";
+import { t } from "../i18n";
 
 type Props = {
   tool: ToolId;
@@ -54,35 +55,35 @@ export function AnnotToolbar({ tool, options, history, onTool, onColor, onWidth,
   return (
     <div className="toolbar annot-toolbar" ref={bar}>
       <div className="group">
-        {TOOLS.map((t) => (
+        {TOOLS.map((b) => (
           <button
-            key={t.id}
-            className={`tool-btn ${tool === t.id ? "is-on" : ""}`}
-            title={`${t.label}${t.key ? ` (${t.key.toUpperCase()})` : ""}`}
-            aria-label={t.label}
-            aria-pressed={tool === t.id}
-            disabled={locked && t.id !== "select"}
-            onClick={() => onTool(t.id)}
+            key={b.id}
+            className={`tool-btn ${tool === b.id ? "is-on" : ""}`}
+            title={`${t(b.label)}${b.key ? ` (${b.key.toUpperCase()})` : ""}`}
+            aria-label={t(b.label)}
+            aria-pressed={tool === b.id}
+            disabled={locked && b.id !== "select"}
+            onClick={() => onTool(b.id)}
           >
-            {t.icon}
+            {b.icon}
           </button>
         ))}
         <div className="menu-anchor">
           <button
             className={`tool-btn ${fill ? "is-on" : ""}`}
-            title="Rellenar y firmar: marcas, fecha e iniciales para formularios sin campos"
+            title={t("Rellenar y firmar: marcas, fecha e iniciales para formularios sin campos")}
             aria-haspopup="menu"
             aria-expanded={menu === "fill"}
             disabled={locked}
             onClick={() => toggle("fill")}
           >
-            {fill ? fill.icon : "✓"} Rellenar ▾
+            {fill ? fill.icon : "✓"} {t("Rellenar")} ▾
           </button>
           {menu === "fill" && (
             <div className="menu" role="menu" onClick={() => setMenu(null)}>
-              {FILL_TOOLS.map((t) => (
-                <button key={t.id} role="menuitem" onClick={() => onTool(t.id)}>
-                  {t.icon} {t.id === "fill-initials" ? `Iniciales (${options.initials || "sin nombre"})` : t.label}
+              {FILL_TOOLS.map((b) => (
+                <button key={b.id} role="menuitem" onClick={() => onTool(b.id)}>
+                  {b.icon} {b.id === "fill-initials" ? t("Iniciales ({initials})", { initials: options.initials || t("sin nombre") }) : t(b.label)}
                 </button>
               ))}
             </div>
@@ -91,23 +92,23 @@ export function AnnotToolbar({ tool, options, history, onTool, onColor, onWidth,
         <div className="menu-anchor">
           <button
             className={`tool-btn ${measure ? "is-on" : ""}`}
-            title="Medir distancias, perímetros y áreas a escala"
+            title={t("Medir distancias, perímetros y áreas a escala")}
             aria-haspopup="menu"
             aria-expanded={menu === "measure"}
             onClick={() => toggle("measure")}
           >
-            📏 Medir ▾
+            📏 {t("Medir")} ▾
           </button>
           {menu === "measure" && (
             <div className="menu" role="menu" onClick={() => setMenu(null)}>
-              {MEASURE_TOOLS.map((t) => (
-                <button key={t.id} role="menuitem" onClick={() => onTool(t.id)}>
-                  {t.icon} {t.label}
+              {MEASURE_TOOLS.map((b) => (
+                <button key={b.id} role="menuitem" onClick={() => onTool(b.id)}>
+                  {b.icon} {t(b.label)}
                 </button>
               ))}
               <hr />
               <button role="menuitem" onClick={onScale}>
-                Escala: {scaleText(options.scale)}…
+                {t("Escala: {scale}…", { scale: scaleText(options.scale) })}
               </button>
             </div>
           )}
@@ -116,7 +117,7 @@ export function AnnotToolbar({ tool, options, history, onTool, onColor, onWidth,
       {showColor && (
         <div className="group">
           {PALETTE.map((c) => (
-            <button key={c.name} className={`swatch-btn ${same(c.rgb, options.color) ? "is-on" : ""}`} title={c.name} onClick={() => onColor(c.rgb)}>
+            <button key={c.name} className={`swatch-btn ${same(c.rgb, options.color) ? "is-on" : ""}`} title={t(c.name)} onClick={() => onColor(c.rgb)}>
               <span className="swatch" style={{ background: css(c.rgb, TEXT_MARKUP.has(tool) ? 0.6 : 1) }} />
             </button>
           ))}
@@ -124,7 +125,7 @@ export function AnnotToolbar({ tool, options, history, onTool, onColor, onWidth,
       )}
       {showWidth && (
         <label className="group">
-          Grosor
+          {t("Grosor")}
           <select value={options.width} onChange={(e) => onWidth(Number(e.target.value))}>
             {WIDTHS.map((w) => (
               <option key={w} value={w}>
@@ -136,15 +137,15 @@ export function AnnotToolbar({ tool, options, history, onTool, onColor, onWidth,
       )}
       {measure && (
         <div className="group">
-          <button onClick={onScale} title="Cambiar la escala">
-            Escala: {scaleText(options.scale)}
+          <button onClick={onScale} title={t("Cambiar la escala")}>
+            {t("Escala: {scale}", { scale: scaleText(options.scale) })}
           </button>
-          <span className="muted">{measure.hint}</span>
+          <span className="muted">{t(measure.hint)}</span>
         </div>
       )}
       {(tool === "freetext" || fill) && (
         <label className="group">
-          Tamaño
+          {t("Tamaño")}
           <select value={options.fontSize} onChange={(e) => onFontSize(Number(e.target.value))}>
             {FONT_SIZES.map((f) => (
               <option key={f} value={f}>
@@ -156,7 +157,7 @@ export function AnnotToolbar({ tool, options, history, onTool, onColor, onWidth,
       )}
       {tool === "stamp" && (
         <label className="group">
-          Sello
+          {t("Sello")}
           <select value={stampKey(options.stamp)} onChange={(e) => onStamp(e.target.value)}>
             {stamps.map((s) => (
               <option key={stampKey(s)} value={stampKey(s)}>
@@ -165,18 +166,18 @@ export function AnnotToolbar({ tool, options, history, onTool, onColor, onWidth,
               </option>
             ))}
           </select>
-          <button onClick={onManageStamps}>Sellos propios…</button>
-          <span className="muted">Haz clic en la página para colocarlo</span>
+          <button onClick={onManageStamps}>{t("Sellos propios…")}</button>
+          <span className="muted">{t("Haz clic en la página para colocarlo")}</span>
         </label>
       )}
       <div className="spacer" />
       {extra && <div className="group">{extra}</div>}
       <div className="group">
-        <button disabled={!history.canUndo} onClick={onUndo} title={history.undoLabel ? `Deshacer: ${history.undoLabel} (⌘Z)` : "Deshacer (⌘Z)"}>
-          ↶ Deshacer
+        <button disabled={!history.canUndo} onClick={onUndo} title={history.undoLabel ? t("Deshacer: {action} (⌘Z)", { action: history.undoLabel }) : t("Deshacer (⌘Z)")}>
+          ↶ {t("Deshacer")}
         </button>
-        <button disabled={!history.canRedo} onClick={onRedo} title={history.redoLabel ? `Rehacer: ${history.redoLabel} (⇧⌘Z)` : "Rehacer (⇧⌘Z)"}>
-          ↷ Rehacer
+        <button disabled={!history.canRedo} onClick={onRedo} title={history.redoLabel ? t("Rehacer: {action} (⇧⌘Z)", { action: history.redoLabel }) : t("Rehacer (⇧⌘Z)")}>
+          ↷ {t("Rehacer")}
         </button>
       </div>
     </div>

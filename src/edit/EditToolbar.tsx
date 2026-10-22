@@ -2,21 +2,22 @@ import type { TextStyle } from "../pdf/content";
 import { css } from "../annot/geometry";
 import { type EditTool, editorHold } from "./EditLayer";
 import { familyName } from "./systemFonts";
+import { t, tk } from "../i18n";
 
 const SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36, 48];
 const COLORS: { name: string; rgb: [number, number, number] }[] = [
-  { name: "Negro", rgb: [0, 0, 0] },
-  { name: "Gris", rgb: [0.35, 0.35, 0.35] },
-  { name: "Azul", rgb: [0.1, 0.25, 0.65] },
-  { name: "Rojo", rgb: [0.75, 0.1, 0.1] },
-  { name: "Verde", rgb: [0.1, 0.45, 0.2] },
+  { name: tk("Negro"), rgb: [0, 0, 0] },
+  { name: tk("Gris"), rgb: [0.35, 0.35, 0.35] },
+  { name: tk("Azul"), rgb: [0.1, 0.25, 0.65] },
+  { name: tk("Rojo"), rgb: [0.75, 0.1, 0.1] },
+  { name: tk("Verde"), rgb: [0.1, 0.45, 0.2] },
 ];
 
 const ALIGNS: [NonNullable<TextStyle["align"]>, string, number][] = [
-  ["left", "Alinear a la izquierda", 0],
-  ["center", "Centrar", 1],
-  ["right", "Alinear a la derecha", 2],
-  ["justify", "Justificar", 3],
+  ["left", tk("Alinear a la izquierda"), 0],
+  ["center", tk("Centrar"), 1],
+  ["right", tk("Alinear a la derecha"), 2],
+  ["justify", tk("Justificar"), 3],
 ];
 
 /** Cuatro rayas como las de los procesadores de texto. */
@@ -57,35 +58,35 @@ export function EditToolbar({ tool, style, hasSelection, onTool, onStyle, onDele
   return (
     <div className="toolbar annot-toolbar" onMouseDown={keepFocus}>
       <div className="group">
-        <button className={`tool-btn ${tool === "select" ? "is-on" : ""}`} aria-pressed={tool === "select"} onClick={() => onTool("select")} title="Editar texto e imágenes">
-          ↖ Editar
+        <button className={`tool-btn ${tool === "select" ? "is-on" : ""}`} aria-pressed={tool === "select"} onClick={() => onTool("select")} title={t("Editar texto e imágenes")}>
+          ↖ {t("Editar")}
         </button>
-        <button className={`tool-btn ${tool === "text" ? "is-on" : ""}`} aria-pressed={tool === "text"} onClick={() => onTool("text")} title="Añadir texto">
-          T Añadir texto
+        <button className={`tool-btn ${tool === "text" ? "is-on" : ""}`} aria-pressed={tool === "text"} onClick={() => onTool("text")} title={t("Añadir texto")}>
+          T {t("Añadir texto")}
         </button>
-        <button className={`tool-btn ${tool === "image" ? "is-on" : ""}`} aria-pressed={tool === "image"} onClick={() => onTool("image")} title="Añadir imagen">
-          ▣ Añadir imagen
+        <button className={`tool-btn ${tool === "image" ? "is-on" : ""}`} aria-pressed={tool === "image"} onClick={() => onTool("image")} title={t("Añadir imagen")}>
+          ▣ {t("Añadir imagen")}
         </button>
-        <button className={`tool-btn ${tool === "link" ? "is-on" : ""}`} aria-pressed={tool === "link"} onClick={() => onTool("link")} title="Crear y cambiar enlaces: arrastra un rectángulo">
-          🔗 Enlace
+        <button className={`tool-btn ${tool === "link" ? "is-on" : ""}`} aria-pressed={tool === "link"} onClick={() => onTool("link")} title={t("Crear y cambiar enlaces: arrastra un rectángulo")}>
+          🔗 {t("Enlace")}
         </button>
-        <button onClick={onFindReplace} title="Buscar un texto en todo el documento y reemplazarlo">
-          Buscar y reemplazar…
+        <button onClick={onFindReplace} title={t("Buscar un texto en todo el documento y reemplazarlo")}>
+          {t("Buscar y reemplazar…")}
         </button>
       </div>
       <div className="group">
         <select
           value={docFont ? "doc" : style.family}
           onChange={(e) => (e.target.value === "doc" ? null : set({ family: e.target.value as TextStyle["family"], font: undefined }))}
-          aria-label="Tipo de letra"
-          title={docFont ? `La del documento: ${docFont}. Si le faltan letras, se usa la del equipo` : undefined}
+          aria-label={t("Tipo de letra")}
+          title={docFont ? t("La del documento: {font}. Si le faltan letras, se usa la del equipo", { font: docFont }) : undefined}
         >
-          {docFont && <option value="doc">{docFont} (del documento)</option>}
+          {docFont && <option value="doc">{t("{font} (del documento)", { font: docFont })}</option>}
           <option value="sans">Helvetica</option>
           <option value="serif">Times</option>
           <option value="mono">Courier</option>
         </select>
-        <select value={style.size} onChange={(e) => set({ size: Number(e.target.value) })} aria-label="Tamaño">
+        <select value={style.size} onChange={(e) => set({ size: Number(e.target.value) })} aria-label={t("Tamaño")}>
           {!SIZES.includes(style.size) && <option value={style.size}>{style.size} pt</option>}
           {SIZES.map((s) => (
             <option key={s} value={s}>
@@ -93,11 +94,12 @@ export function EditToolbar({ tool, style, hasSelection, onTool, onStyle, onDele
             </option>
           ))}
         </select>
-        <button className={`tool-btn ${style.bold ? "is-on" : ""}`} aria-pressed={style.bold} onClick={() => set({ bold: !style.bold })} title="Negrita" aria-label="Negrita">
-          <b>N</b>
+        <button className={`tool-btn ${style.bold ? "is-on" : ""}`} aria-pressed={style.bold} onClick={() => set({ bold: !style.bold })} title={t("Negrita")} aria-label={t("Negrita")}>
+          {/* Inicial de «Negrita» en cada idioma */}
+          <b>{t("N")}</b>
         </button>
-        <button className={`tool-btn ${style.italic ? "is-on" : ""}`} aria-pressed={style.italic} onClick={() => set({ italic: !style.italic })} title="Cursiva" aria-label="Cursiva">
-          <i>K</i>
+        <button className={`tool-btn ${style.italic ? "is-on" : ""}`} aria-pressed={style.italic} onClick={() => set({ italic: !style.italic })} title={t("Cursiva")} aria-label={t("Cursiva")}>
+          <i>{t("K")}</i>
         </button>
         {ALIGNS.map(([align, label, icon]) => (
           <button
@@ -105,26 +107,26 @@ export function EditToolbar({ tool, style, hasSelection, onTool, onStyle, onDele
             className={`tool-btn ${(style.align ?? "left") === align ? "is-on" : ""}`}
             aria-pressed={(style.align ?? "left") === align}
             onClick={() => set({ align })}
-            title={label}
-            aria-label={label}
+            title={t(label)}
+            aria-label={t(label)}
           >
             <AlignIcon kind={icon} />
           </button>
         ))}
         {COLORS.map((c) => (
-          <button key={c.name} className={`swatch-btn ${style.color.every((v, i) => Math.abs(v - c.rgb[i]) < 0.02) ? "is-on" : ""}`} title={c.name} onClick={() => set({ color: c.rgb })}>
+          <button key={c.name} className={`swatch-btn ${style.color.every((v, i) => Math.abs(v - c.rgb[i]) < 0.02) ? "is-on" : ""}`} title={t(c.name)} onClick={() => set({ color: c.rgb })}>
             <span className="swatch" style={{ background: css(c.rgb) }} />
           </button>
         ))}
       </div>
-      <button className="danger" disabled={!hasSelection} onClick={onDelete} title="Eliminar lo seleccionado (⌫)">
-        Eliminar
+      <button className="danger" disabled={!hasSelection} onClick={onDelete} title={t("Eliminar lo seleccionado (⌫)")}>
+        {t("Eliminar")}
       </button>
       <div className="spacer" />
       <div className="group">
-        <button onClick={onHeaderFooter}>Encabezado y pie…</button>
-        <button onClick={onBates}>Bates…</button>
-        <button onClick={onWatermark}>Marca de agua…</button>
+        <button onClick={onHeaderFooter}>{t("Encabezado y pie…")}</button>
+        <button onClick={onBates}>{t("Bates…")}</button>
+        <button onClick={onWatermark}>{t("Marca de agua…")}</button>
       </div>
     </div>
   );

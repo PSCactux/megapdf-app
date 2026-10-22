@@ -3,6 +3,7 @@ import { pdf } from "../pdf/client";
 import type { Margins } from "../pdf/document";
 import type { PageSize } from "../pdf/engine";
 import { parseRanges } from "../pdf/pages";
+import { t, tk } from "../i18n";
 
 type Props = {
   docId: string;
@@ -22,10 +23,10 @@ type Props = {
 const MM = 72 / 25.4;
 const PREVIEW_HEIGHT = 340;
 const SIDES = [
-  ["top", "Arriba"],
-  ["bottom", "Abajo"],
-  ["left", "Izquierda"],
-  ["right", "Derecha"],
+  ["top", tk("Arriba")],
+  ["bottom", tk("Abajo")],
+  ["left", tk("Izquierda")],
+  ["right", tk("Derecha")],
 ] as const;
 
 /** Recortar páginas: márgenes en milímetros, sobre una vista previa en la que se puede dibujar. */
@@ -50,7 +51,7 @@ export function CropDialog({ docId, pages, page, cropped, onCrop, onCropWhite, o
         c.height = r.height;
         c.getContext("2d")!.putImageData(new ImageData(r.pixels as Uint8ClampedArray<ArrayBuffer>, r.width, r.height), 0, 0);
       },
-      (e) => onError(`No se pudo mostrar la página: ${e instanceof Error ? e.message : e}`),
+      (e) => onError(t("No se pudo mostrar la página: {error}", { error: e instanceof Error ? e.message : String(e) })),
     );
   }, [docId, page]);
 
@@ -65,8 +66,8 @@ export function CropDialog({ docId, pages, page, cropped, onCrop, onCropWhite, o
   } catch (e) {
     problem = (e as Error).message;
   }
-  if (!problem && (box.width < 20 || box.height < 20)) problem = "Con esos márgenes casi no queda página.";
-  const anyCropped = targets.some((t) => cropped.includes(t));
+  if (!problem && (box.width < 20 || box.height < 20)) problem = t("Con esos márgenes casi no queda página.");
+  const anyCropped = targets.some((p) => cropped.includes(p));
   const round = (v: number) => Math.max(0, Math.round(v * 10) / 10);
 
   /** Dibujar un rectángulo sobre la vista previa fija los cuatro márgenes. */
@@ -93,13 +94,13 @@ export function CropDialog({ docId, pages, page, cropped, onCrop, onCropWhite, o
     <div className="modal-backdrop">
       <form
         className="modal modal-wide crop-dialog"
-        aria-label="Recortar páginas"
+        aria-label={t("Recortar páginas")}
         onSubmit={(e) => {
           e.preventDefault();
           if (!problem) run("crop");
         }}
       >
-        <h2>Recortar páginas</h2>
+        <h2>{t("Recortar páginas")}</h2>
         <div className="crop-body">
           <div
             className="crop-preview"
@@ -110,17 +111,17 @@ export function CropDialog({ docId, pages, page, cropped, onCrop, onCropWhite, o
             }}
             onPointerMove={(e) => drag && fromDrag(drag, local(e))}
             onPointerUp={() => setDrag(null)}
-            title="Arrastra para marcar la zona que se queda"
+            title={t("Arrastra para marcar la zona que se queda")}
           >
             <canvas ref={canvasRef} style={{ width: w, height: h }} />
             <div className="crop-keep" style={box} />
           </div>
           <div className="crop-controls">
-            <p className="hint">Arrastra sobre la página la zona que quieres conservar, o escribe los márgenes que se quitan.</p>
+            <p className="hint">{t("Arrastra sobre la página la zona que quieres conservar, o escribe los márgenes que se quitan.")}</p>
             <div className="crop-margins">
               {SIDES.map(([k, label]) => (
                 <label key={k} className="prop">
-                  {label} (mm)
+                  {t(label)} (mm)
                   <input
                     id={`crop-${k}`}
                     type="number"
@@ -140,31 +141,31 @@ export function CropDialog({ docId, pages, page, cropped, onCrop, onCropWhite, o
               onClick={async () => {
                 try {
                   const m = await pdf.call("whiteMargins", [docId, page]);
-                  if (!m) return onError("La página está en blanco: no hay nada que recortar.");
+                  if (!m) return onError(t("La página está en blanco: no hay nada que recortar."));
                   setMm({ left: round(m.left / MM), top: round(m.top / MM), right: round(m.right / MM), bottom: round(m.bottom / MM) });
                   setAuto(true);
                 } catch (e) {
-                  onError(`No se pudieron calcular los márgenes: ${e instanceof Error ? e.message : e}`);
+                  onError(t("No se pudieron calcular los márgenes: {error}", { error: e instanceof Error ? e.message : String(e) }));
                 }
               }}
             >
-              Quitar los márgenes en blanco
+              {t("Quitar los márgenes en blanco")}
             </button>
-            {auto && scope !== "page" && <p className="hint">Los márgenes se calculan en cada página: arriba se ven los de esta.</p>}
+            {auto && scope !== "page" && <p className="hint">{t("Los márgenes se calculan en cada página: arriba se ven los de esta.")}</p>}
             <fieldset className="prop-group">
-              <legend>Aplicar a</legend>
+              <legend>{t("Aplicar a")}</legend>
               <label className="radio">
                 <input type="radio" checked={scope === "page"} onChange={() => setScope("page")} />
-                Esta página ({page + 1})
+                {t("Esta página ({n})", { n: page + 1 })}
               </label>
               <label className="radio">
                 <input type="radio" checked={scope === "all"} onChange={() => setScope("all")} />
-                Todas las páginas ({pages.length})
+                {t("Todas las páginas ({n})", { n: pages.length })}
               </label>
               <label className="radio">
                 <input type="radio" checked={scope === "range"} onChange={() => setScope("range")} />
-                Páginas
-                <input className="indent" value={range} placeholder="Ej.: 1-3, 5" aria-label="Páginas que recortar" onFocus={() => setScope("range")} onChange={(e) => setRange(e.target.value)} />
+                {t("Páginas")}
+                <input className="indent" value={range} placeholder={t("Ej.: 1-3, 5")} aria-label={t("Páginas que recortar")} onFocus={() => setScope("range")} onChange={(e) => setRange(e.target.value)} />
               </label>
             </fieldset>
           </div>
@@ -173,14 +174,14 @@ export function CropDialog({ docId, pages, page, cropped, onCrop, onCropWhite, o
         <div className="modal-actions">
           {anyCropped && (
             <button type="button" style={{ marginRight: "auto" }} disabled={busy} onClick={() => run("uncrop")}>
-              Quitar recorte
+              {t("Quitar recorte")}
             </button>
           )}
           <button type="button" onClick={onCancel}>
-            Cancelar
+            {t("Cancelar")}
           </button>
           <button type="submit" className="primary" disabled={!!problem || busy}>
-            Recortar
+            {t("Recortar")}
           </button>
         </div>
       </form>

@@ -3,6 +3,7 @@ import { RESIZABLE, type Annot, type AnnotPatch } from "../pdf/annotations";
 import type { Reply, ReviewState } from "../pdf/review";
 import { css } from "./geometry";
 import { FONT_SIZES, PALETTE, TYPE_LABELS, WIDTHS } from "./tools";
+import { locale, t, tk } from "../i18n";
 
 type Props = {
   annots: Annot[];
@@ -12,7 +13,10 @@ type Props = {
   onSelect: (a: Annot) => void;
   onPatch: (a: Annot, patch: AnnotPatch) => void;
   onRemove: (a: Annot) => void;
-  /** Cómo llamar a los elementos de la lista (singular y plural). */
+  /**
+   * Cómo llamar a los elementos de la lista (singular y plural). Si se da, la lista es de marcas
+   * de redacción: los textos se eligen en el idioma de la interfaz y no se usa el texto recibido.
+   */
   noun?: [string, string];
   /** Nombre con el que se firman los comentarios nuevos y cómo cambiarlo. */
   author?: string;
@@ -28,17 +32,20 @@ type Props = {
 };
 
 export const STATES: [ReviewState, string][] = [
-  ["None", "Sin estado"],
-  ["Accepted", "Aceptado"],
-  ["Rejected", "Rechazado"],
-  ["Cancelled", "Cancelado"],
-  ["Completed", "Completado"],
+  ["None", tk("Sin estado")],
+  ["Accepted", tk("Aceptado")],
+  ["Rejected", tk("Rechazado")],
+  ["Cancelled", tk("Cancelado")],
+  ["Completed", tk("Completado")],
 ];
-const stateLabel = (s: ReviewState) => STATES.find(([k]) => k === s)?.[1] ?? s;
+const stateLabel = (s: ReviewState) => {
+  const label = STATES.find(([k]) => k === s)?.[1];
+  return label ? t(label) : s;
+};
 type Filters = { author: string; type: string; state: string; text: string };
 const NO_FILTERS: Filters = { author: "", type: "", state: "", text: "" };
 
-const dateFormat = new Intl.DateTimeFormat("es-ES", { dateStyle: "short", timeStyle: "short" });
+const dateFormat = { format: (d: Date | number) => new Intl.DateTimeFormat(locale(), { dateStyle: "short", timeStyle: "short" }).format(d) };
 const OPACITIES = [1, 0.75, 0.5, 0.25];
 
 export function CommentsPanel({
@@ -48,7 +55,7 @@ export function CommentsPanel({
   onSelect,
   onPatch,
   onRemove,
-  noun = ["comentario", "comentarios"],
+  noun,
   author,
   onChangeAuthor,
   review,
@@ -57,9 +64,9 @@ export function CommentsPanel({
   const [exportMenu, setExportMenu] = useState(false);
   const who = author && onChangeAuthor && (
     <div className="comments-author">
-      Comentas como <strong>{author}</strong> ·{" "}
+      {t("Comentas como")} <strong>{author}</strong> ·{" "}
       <button className="link-button" onClick={onChangeAuthor}>
-        Cambiar
+        {t("Cambiar")}
       </button>
     </div>
   );
@@ -69,7 +76,9 @@ export function CommentsPanel({
     listRef.current?.querySelector(".comment.is-selected")?.scrollIntoView({ block: "nearest" });
   }, [selectedId]);
 
-  const kindOf = (a: Annot) => a.stampLabel ?? TYPE_LABELS[a.type] ?? a.type;
+  // Las listas de marcas de redacción reciben `noun`; la de comentarios, no
+  const redaction = !!noun;
+  const kindOf = (a: Annot) => a.stampLabel ?? (TYPE_LABELS[a.type] ? t(TYPE_LABELS[a.type]) : a.type);
   const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
   const visible = annots.filter(
     (a) =>
@@ -87,9 +96,9 @@ export function CommentsPanel({
       <>
         {who}
         <p className="sidebar-empty">
-          {noun[0] === "comentario"
-            ? "No hay comentarios. Usa las herramientas de la barra para añadir resaltados, notas, formas o sellos."
-            : "No hay nada marcado para redactar. Marca áreas o texto, o usa «Buscar y redactar»."}
+          {!redaction
+            ? t("No hay comentarios. Usa las herramientas de la barra para añadir resaltados, notas, formas o sellos.")
+            : t("No hay nada marcado para redactar. Marca áreas o texto, o usa «Buscar y redactar».")}
         </p>
       </>
     );
@@ -100,29 +109,29 @@ export function CommentsPanel({
       {who}
       {review && (
         <div className="comments-tools">
-          <input className="comments-search" type="search" placeholder="Buscar en los comentarios" aria-label="Buscar en los comentarios" value={filters.text} onChange={(e) => setFilters({ ...filters, text: e.target.value })} onKeyDown={(e) => e.stopPropagation()} />
+          <input className="comments-search" type="search" placeholder={t("Buscar en los comentarios")} aria-label={t("Buscar en los comentarios")} value={filters.text} onChange={(e) => setFilters({ ...filters, text: e.target.value })} onKeyDown={(e) => e.stopPropagation()} />
           <div className="comments-filters">
-            <select aria-label="Filtrar por autor" value={filters.author} onChange={(e) => setFilters({ ...filters, author: e.target.value })}>
-              <option value="">Todos los autores</option>
+            <select aria-label={t("Filtrar por autor")} value={filters.author} onChange={(e) => setFilters({ ...filters, author: e.target.value })}>
+              <option value="">{t("Todos los autores")}</option>
               {authors.map((n) => (
                 <option key={n} value={n}>
                   {n}
                 </option>
               ))}
             </select>
-            <select aria-label="Filtrar por tipo" value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })}>
-              <option value="">Todos los tipos</option>
+            <select aria-label={t("Filtrar por tipo")} value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })}>
+              <option value="">{t("Todos los tipos")}</option>
               {kinds.map((k) => (
                 <option key={k} value={k}>
                   {k}
                 </option>
               ))}
             </select>
-            <select aria-label="Filtrar por estado" value={filters.state} onChange={(e) => setFilters({ ...filters, state: e.target.value })}>
-              <option value="">Cualquier estado</option>
+            <select aria-label={t("Filtrar por estado")} value={filters.state} onChange={(e) => setFilters({ ...filters, state: e.target.value })}>
+              <option value="">{t("Cualquier estado")}</option>
               {STATES.map(([k, label]) => (
                 <option key={k} value={k}>
-                  {label}
+                  {t(label)}
                 </option>
               ))}
             </select>
@@ -130,24 +139,24 @@ export function CommentsPanel({
         </div>
       )}
       <div className="comments-count">
-        {filtering ? `${visible.length} de ${annots.length} ${noun[1]}` : annots.length === 1 ? `1 ${noun[0]}` : `${annots.length} ${noun[1]}`}
+        {count(redaction, filtering ? visible.length : null, annots.length)}
         {filtering && (
           <button className="link-button" onClick={() => setFilters(NO_FILTERS)}>
-            Quitar filtros
+            {t("Quitar filtros")}
           </button>
         )}
         {review && (
           <span className="menu-anchor comments-export">
             <button className="link-button" onClick={() => setExportMenu(!exportMenu)} aria-haspopup="menu" aria-expanded={exportMenu}>
-              Exportar resumen ▾
+              {t("Exportar resumen")} ▾
             </button>
             {exportMenu && (
               <div className="menu" role="menu" onClick={() => setExportMenu(false)}>
                 <button role="menuitem" onClick={() => review.onExport("pdf")}>
-                  Resumen en PDF
+                  {t("Resumen en PDF")}
                 </button>
                 <button role="menuitem" onClick={() => review.onExport("xlsx")}>
-                  Resumen en Excel…
+                  {t("Resumen en Excel…")}
                 </button>
               </div>
             )}
@@ -159,7 +168,7 @@ export function CommentsPanel({
         const newPage = i === 0 || visible[i - 1].page !== a.page;
         return (
           <div key={a.id}>
-            {newPage && <div className="comments-page">Página {a.page + 1}</div>}
+            {newPage && <div className="comments-page">{t("Página {n}", { n: a.page + 1 })}</div>}
             <div className={`comment ${isSelected ? "is-selected" : ""}`} onClick={() => !isSelected && onSelect(a)}>
               <div className="comment-head">
                 <span className="swatch" style={{ background: a.color ? css(a.color) : "transparent" }} />
@@ -168,7 +177,7 @@ export function CommentsPanel({
                 <span className="muted comment-date">{a.modified ? dateFormat.format(a.modified) : ""}</span>
               </div>
               {a.status && (
-                <span className={`status-chip status-${a.status.state.toLowerCase()}`} title={`${stateLabel(a.status.state)} por ${a.status.author}`}>
+                <span className={`status-chip status-${a.status.state.toLowerCase()}`} title={t("{state} por {author}", { state: stateLabel(a.status.state), author: a.status.author })}>
                   {stateLabel(a.status.state)}
                 </span>
               )}
@@ -182,7 +191,7 @@ export function CommentsPanel({
                   {a.contents && a.type !== "Stamp" && <p className="comment-text">{a.contents}</p>}
                   {a.replies.length > 0 && (
                     <span className="muted comment-replies">
-                      💬 {a.replies.length} {a.replies.length === 1 ? "respuesta" : "respuestas"}
+                      💬 {a.replies.length === 1 ? t("{n} respuesta", { n: 1 }) : t("{n} respuestas", { n: a.replies.length })}
                     </span>
                   )}
                 </>
@@ -207,11 +216,11 @@ function Thread({ annot, review }: { annot: Annot; review: NonNullable<Props["re
   return (
     <div className="thread" onClick={(e) => e.stopPropagation()}>
       <label className="prop">
-        Estado
-        <select aria-label="Estado" value={annot.status?.state ?? "None"} onChange={(e) => review.onState(annot, e.target.value as ReviewState)}>
+        {t("Estado")}
+        <select aria-label={t("Estado")} value={annot.status?.state ?? "None"} onChange={(e) => review.onState(annot, e.target.value as ReviewState)}>
           {STATES.map(([k, label]) => (
             <option key={k} value={k}>
-              {label}
+              {t(label)}
             </option>
           ))}
         </select>
@@ -219,13 +228,13 @@ function Thread({ annot, review }: { annot: Annot; review: NonNullable<Props["re
       {annot.replies.map((r) => (
         <div key={r.id} className="reply">
           <div className="comment-head">
-            <strong>{r.author || "Sin autor"}</strong>
+            <strong>{r.author || t("Sin autor")}</strong>
             <span className="muted comment-date">{r.modified ? dateFormat.format(r.modified) : ""}</span>
           </div>
           {editing === r.id ? (
             <textarea
               className="comment-input"
-              aria-label="Editar respuesta"
+              aria-label={t("Editar respuesta")}
               defaultValue={r.contents}
               autoFocus
               rows={2}
@@ -244,18 +253,18 @@ function Thread({ annot, review }: { annot: Annot; review: NonNullable<Props["re
           )}
           <div className="reply-actions">
             <button className="link-button" onClick={() => setEditing(r.id)}>
-              Editar
+              {t("Editar")}
             </button>
             <button className="link-button" onClick={() => review.onDeleteReply(annot, r)}>
-              Eliminar
+              {t("Eliminar")}
             </button>
           </div>
         </div>
       ))}
       <textarea
         className="comment-input"
-        aria-label="Responder"
-        placeholder="Responder…"
+        aria-label={t("Responder")}
+        placeholder={t("Responder…")}
         rows={2}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
@@ -266,9 +275,9 @@ function Thread({ annot, review }: { annot: Annot; review: NonNullable<Props["re
       />
       <div className="props-row">
         <button onClick={send} disabled={!draft.trim()}>
-          Responder
+          {t("Responder")}
         </button>
-        <span className="muted">⌘↵ para enviar</span>
+        <span className="muted">{t("⌘↵ para enviar")}</span>
       </div>
     </div>
   );
@@ -284,7 +293,7 @@ function Properties({ annot, autoFocus, onPatch, onRemove }: { annot: Annot; aut
           key={annot.id + annot.contents}
           className="comment-input"
           defaultValue={annot.contents}
-          placeholder={annot.type === "FreeText" ? "Texto" : "Añade un comentario…"}
+          placeholder={annot.type === "FreeText" ? t("Texto") : t("Añade un comentario…")}
           autoFocus={autoFocus}
           rows={3}
           onBlur={(e) => e.target.value !== annot.contents && onPatch({ contents: e.target.value })}
@@ -296,14 +305,14 @@ function Properties({ annot, autoFocus, onPatch, onRemove }: { annot: Annot; aut
       )}
       <div className="props-row">
         {PALETTE.map((c) => (
-          <button key={c.name} className="swatch-btn" title={c.name} onClick={() => onPatch({ color: c.rgb })}>
+          <button key={c.name} className="swatch-btn" title={t(c.name)} onClick={() => onPatch({ color: c.rgb })}>
             <span className="swatch" style={{ background: css(c.rgb) }} />
           </button>
         ))}
       </div>
       <div className="props-row">
         <label>
-          Opacidad
+          {t("Opacidad")}
           <select value={closest(OPACITIES, annot.opacity)} onChange={(e) => onPatch({ opacity: Number(e.target.value) })}>
             {OPACITIES.map((o) => (
               <option key={o} value={o}>
@@ -314,7 +323,7 @@ function Properties({ annot, autoFocus, onPatch, onRemove }: { annot: Annot; aut
         </label>
         {hasWidth && (
           <label>
-            Grosor
+            {t("Grosor")}
             <select value={closest(WIDTHS, annot.borderWidth ?? 1)} onChange={(e) => onPatch({ borderWidth: Number(e.target.value) })}>
               {WIDTHS.map((w) => (
                 <option key={w} value={w}>
@@ -326,7 +335,7 @@ function Properties({ annot, autoFocus, onPatch, onRemove }: { annot: Annot; aut
         )}
         {annot.type === "FreeText" && (
           <label>
-            Tamaño
+            {t("Tamaño")}
             <select value={closest(FONT_SIZES, annot.fontSize ?? 12)} onChange={(e) => onPatch({ fontSize: Number(e.target.value) })}>
               {FONT_SIZES.map((f) => (
                 <option key={f} value={f}>
@@ -338,7 +347,7 @@ function Properties({ annot, autoFocus, onPatch, onRemove }: { annot: Annot; aut
         )}
       </div>
       <label className="prop">
-        Autor
+        {t("Autor")}
         <input
           key={annot.id + annot.author}
           defaultValue={annot.author}
@@ -350,13 +359,20 @@ function Properties({ annot, autoFocus, onPatch, onRemove }: { annot: Annot; aut
         />
       </label>
       <div className="props-row props-actions">
-        <span className="muted">{RESIZABLE.has(annot.type) ? "Arrastra para mover o desde las esquinas para cambiar el tamaño." : "Arrastra para mover."}</span>
+        <span className="muted">{RESIZABLE.has(annot.type) ? t("Arrastra para mover o desde las esquinas para cambiar el tamaño.") : t("Arrastra para mover.")}</span>
         <button className="danger" onClick={onRemove}>
-          Eliminar
+          {t("Eliminar")}
         </button>
       </div>
     </div>
   );
+}
+
+/** «3 comentarios», «1 marca de redacción», «2 de 5 comentarios» (con filtros). */
+function count(redaction: boolean, shown: number | null, total: number): string {
+  if (shown !== null) return redaction ? t("{shown} de {total} marcas de redacción", { shown, total }) : t("{shown} de {total} comentarios", { shown, total });
+  if (total === 1) return redaction ? t("1 marca de redacción") : t("1 comentario");
+  return redaction ? t("{n} marcas de redacción", { n: total }) : t("{n} comentarios", { n: total });
 }
 
 const closest = (values: number[], v: number) => values.reduce((a, b) => (Math.abs(b - v) < Math.abs(a - v) ? b : a));

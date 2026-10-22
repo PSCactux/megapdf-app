@@ -8,6 +8,7 @@ import { DEFAULT_COLORS, TEXT_MARKUP, type ToolId } from "./tools";
 import { type HandSignature, dataUrlToBytes } from "../sign/signatures";
 import type { StampChoice } from "./customStamps";
 import { type MeasureKind, type Scale, measureLabel, scaleText } from "./measure";
+import { locale, t } from "../i18n";
 
 const MEASURE_KIND: Partial<Record<ToolId, MeasureKind>> = { "measure-distance": "distance", "measure-perimeter": "perimeter", "measure-area": "area" };
 
@@ -111,7 +112,7 @@ export function PageOverlay(props: Props) {
         try {
           setLiveQuads((await props.selectText(a, b)).quads);
         } catch (e) {
-          props.onError(`No se pudo seleccionar el texto: ${e instanceof Error ? e.message : e}`);
+          props.onError(t("No se pudo seleccionar el texto: {error}", { error: e instanceof Error ? e.message : String(e) }));
         }
       }
       s.busy = false;
@@ -157,7 +158,7 @@ export function PageOverlay(props: Props) {
       return props.onCreate({ type: "Mark", at: p, mark, color: options.color, size: options.fontSize + 2 });
     }
     if (tool === "fill-date" || tool === "fill-initials") {
-      const text = tool === "fill-date" ? new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" }) : options.initials || "?";
+      const text = tool === "fill-date" ? new Date().toLocaleDateString(locale(), { day: "2-digit", month: "2-digit", year: "numeric" }) : options.initials || "?";
       const size = options.fontSize;
       // Se escribe con la línea base en el clic, como al escribir sobre una raya
       const width = text.length * size * 0.62 + 6;
@@ -208,7 +209,7 @@ export function PageOverlay(props: Props) {
           if (tool === "select") props.onTextSelect({ ...sel, page });
           else props.onCreate(markupSpec(tool, sel.quads, options.color));
         } catch (e) {
-          props.onError(`No se pudo seleccionar el texto: ${e instanceof Error ? e.message : e}`);
+          props.onError(t("No se pudo seleccionar el texto: {error}", { error: e instanceof Error ? e.message : String(e) }));
         }
         return;
       }
@@ -352,7 +353,7 @@ export function PageOverlay(props: Props) {
           className="freetext-editor"
           autoFocus
           value={editor.text}
-          placeholder="Escribe…"
+          placeholder={t("Escribe…")}
           style={{
             left: s(editor.rect[0]),
             top: s(editor.rect[1]),
@@ -374,10 +375,10 @@ export function PageOverlay(props: Props) {
 
       {lastQuad && (
         <div className="sel-menu" style={{ left: s(lastQuad.x), top: s(lastQuad.y + lastQuad.height) + 6 }} onPointerDown={(e) => e.stopPropagation()}>
-          <button onClick={props.onCopy}>Copiar</button>
-          {(["highlight", "underline", "strike"] as const).map((t) => (
-            <button key={t} onClick={() => props.onCreate({ type: MARKUP_TYPE[t], quads: textSel!.quads, color: DEFAULT_COLORS[t] })}>
-              {{ highlight: "Resaltar", underline: "Subrayar", strike: "Tachar" }[t]}
+          <button onClick={props.onCopy}>{t("Copiar")}</button>
+          {(["highlight", "underline", "strike"] as const).map((m) => (
+            <button key={m} onClick={() => props.onCreate({ type: MARKUP_TYPE[m], quads: textSel!.quads, color: DEFAULT_COLORS[m] })}>
+              {{ highlight: t("Resaltar"), underline: t("Subrayar"), strike: t("Tachar") }[m]}
             </button>
           ))}
         </div>

@@ -14,6 +14,8 @@ import { FolderSearchDialog } from "./search/FolderSearchDialog";
 import { BatchDialog } from "./batch/BatchDialog";
 import { MergeDialog } from "./organize/MergeDialog";
 import { PreferencesDialog } from "./Preferences";
+import { LanguageDialog } from "./LanguageDialog";
+import { type Lang, closestLang, setLang, t } from "./i18n";
 import { type Prefs, type ReadingTheme, clearRecent, loadPrefs, loadReadingTheme, loadRecent, pushRecent, removeRecent, savePrefs, saveReadingTheme } from "./prefs";
 import "./App.css";
 
@@ -41,12 +43,14 @@ export default function App() {
   const [passwordPrompt, setPasswordPrompt] = useState<PasswordPrompt | null>(null);
   const [notice, setNotice] = useState<{ kind: "error" | "info"; text: string } | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [systemName, setSystemName] = useState("Usuario");
+  const [systemName, setSystemName] = useState(t("Usuario"));
   const [merging, setMerging] = useState(false);
   /** Aplicaciones de Microsoft Office instaladas ("word", "excel", "powerpoint"). */
   const [installedOffice, setInstalledOffice] = useState<string[]>([]);
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
   const [prefsOpen, setPrefsOpen] = useState(false);
+  /** Primer arranque: idioma propuesto (el del sistema) mientras se pregunta. */
+  const [askLanguage, setAskLanguage] = useState<Lang | null>(null);
   const [readingTheme, setReadingTheme] = useState<ReadingTheme>(loadReadingTheme);
   const [folderSearch, setFolderSearch] = useState(false);
   const [batch, setBatch] = useState(false);
@@ -67,9 +71,50 @@ export default function App() {
 
   const showError = useCallback((text: string) => setNotice({ kind: "error", text }), []);
 
+  /** Cambia el idioma de la interfaz, del motor y del menú nativo. */
+  function applyLanguage(lang: Lang) {
+    setLang(lang);
+    document.documentElement.lang = lang;
+    pdf.call("setLanguage", [lang]).catch((e) => console.error(e));
+    invoke("set_language", { lang }).catch((e) => console.error(e));
+  }
+
+  function chooseLanguage(lang: Lang) {
+    const next = { ...prefs, language: lang };
+    try {
+      savePrefs(next);
+    } catch (e) {
+      showError(message(e));
+    }
+    applyLanguage(lang);
+    setPrefs(next);
+    setAskLanguage(null);
+  }
+
+  // Idioma: el elegido, o se pregunta la primera vez (con el del sistema ya marcado)
   useEffect(() => {
-    invoke<string>("user_name").then(setSystemName, (e) => showError(`No se pudo leer el nombre de usuario: ${message(e)}`));
-    invoke<string[]>("office_apps").then(setInstalledOffice, (e) => showError(`No se pudo comprobar si Microsoft Office está instalado: ${message(e)}`));
+    applyLanguage(prefs.language ?? "es");
+    if (!prefs.language) {
+      invoke<string | null>("system_locale").then(
+        (l) => setAskLanguage(closestLang(l ?? navigator.language)),
+        () => setAskLanguage(closestLang(navigator.language)),
+      );
+    }
+    // Si se cambia en otra ventana, esta también cambia
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== "megapdf.prefs") return;
+      const next = loadPrefs();
+      setPrefs(next);
+      if (next.language) applyLanguage(next.language);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    invoke<string>("user_name").then(setSystemName, (e) => showError(t("No se pudo leer el nombre de usuario: {error}", { error: message(e) })));
+    invoke<string[]>("office_apps").then(setInstalledOffice, (e) => showError(t("No se pudo comprobar si Microsoft Office está instalado: {error}", { error: message(e) })));
   }, [showError]);
 
   /** Añade el archivo a recientes; si no se puede guardar la lista, se avisa sin interrumpir. */
@@ -102,7 +147,7 @@ export default function App() {
         await pdf.call("open", [id, bytes]);
         await addTab(id, null, name);
       } catch (e) {
-        showError(`No se pudo abrir ${name}: ${message(e)}`);
+        showError(t("No se pudo abrir {name}: {error}", { name, error: message(e) }));
       }
     },
     [addTab, showError],
@@ -117,9 +162,15 @@ export default function App() {
       const at = (await pdf.call("info", [to])).pages.length;
       await pdf.call("insertPdf", [to, at, bytes]);
       setCommand((c) => ({ name: "refresh", n: (c?.n ?? 0) + 1, target: to }));
-      setNotice({ kind: "info", text: `${pages.length === 1 ? `Página ${pages[0] + 1} copiada` : `${pages.length} páginas copiadas`} al final de ${target.name}` });
+      setNotice({
+        kind: "info",
+        text:
+          pages.length === 1
+            ? t("Página {page} copiada al final de {name}", { page: pages[0] + 1, name: target.name })
+            : t("{n} páginas copiadas al final de {name}", { n: pages.length, name: target.name }),
+      });
     } catch (e) {
-      showError(`No se pudieron copiar las páginas: ${message(e)}`);
+      showError(t("No se pudieron copiar las páginas: {error}", { error: message(e) }));
     }
   }
 
@@ -130,12 +181,12 @@ export default function App() {
   async function sendPages(from: string, pages: number[], screenX: number, screenY: number) {
     try {
       const target = await invoke<{ label: string; x: number; y: number } | null>("window_at", { from: thisWindow.label, x: screenX, y: screenY });
-      if (!target) return setNotice({ kind: "info", text: "Para copiar páginas a otro documento, suéltalas sobre otra ventana de MegaPDF o sobre la pestaña del documento" });
-      const name = tabsRef.current.find((t) => t.id === from)?.name ?? "otro documento";
+      if (!target) return setNotice({ kind: "info", text: t("Para copiar páginas a otro documento, suéltalas sobre otra ventana de MegaPDF o sobre la pestaña del documento") });
+      const name = tabsRef.current.find((t) => t.id === from)?.name ?? t("otro documento");
       const token = await invoke<string>("stash_document", await pdf.call("extractPages", [from, pages]));
       await emitTo(target.label, "drop-pages", { token, x: target.x, y: target.y, count: pages.length, from: name });
     } catch (e) {
-      showError(`No se pudieron pasar las páginas a la otra ventana: ${message(e)}`);
+      showError(t("No se pudieron pasar las páginas a la otra ventana: {error}", { error: message(e) }));
     }
   }
 
@@ -158,7 +209,7 @@ export default function App() {
         await addTab(id, path);
         return id;
       } catch (e) {
-        showError(`No se pudo abrir ${fileName(path)}: ${message(e)}`);
+        showError(t("No se pudo abrir {name}: {error}", { name: fileName(path), error: message(e) }));
         // Un reciente que ya no se puede abrir (movido o borrado) sale de la lista
         if (loadRecent().includes(path)) {
           try {
@@ -189,7 +240,7 @@ export default function App() {
       }
     } catch (e) {
       setPasswordPrompt(null);
-      showError(`No se pudo abrir ${fileName(prompt.path)}: ${message(e)}`);
+      showError(t("No se pudo abrir {name}: {error}", { name: fileName(prompt.path), error: message(e) }));
     }
   }
 
@@ -205,18 +256,18 @@ export default function App() {
       if (!path) return false;
       await writeFile(path, await pdf.call("save", [tab.id]));
       setTabs((ts) => ts.map((t) => (t.id === tab.id ? { ...t, path, name: fileName(path) } : t)));
-      setNotice({ kind: "info", text: `Guardado en ${path}` });
+      setNotice({ kind: "info", text: t("Guardado en {path}", { path }) });
       remember(path);
       return true;
     } catch (e) {
-      showError(`No se pudo guardar: ${message(e)}`);
+      showError(t("No se pudo guardar: {error}", { error: message(e) }));
       return false;
     }
   }
 
   /** Guarda el PDF firmado en un archivo nuevo y lo abre en lugar del documento original. */
   async function replaceWithSigned(tab: Tab, bytes: Uint8Array) {
-    const suggested = `${baseName(tab.name)} (firmado).pdf`;
+    const suggested = t("{name} (firmado).pdf", { name: baseName(tab.name) });
     const path = await pickSavePath(tab.path ? joinPath(dirName(tab.path), suggested) : suggested);
     if (!path) return;
     await writeFile(path, bytes);
@@ -225,7 +276,7 @@ export default function App() {
     const info = await pdf.call("info", [id]);
     setTabs((ts) => ts.map((t) => (t.id === tab.id ? { id, path, name: fileName(path), info, dirty: false } : t)));
     setActiveId((a) => (a === tab.id ? id : a));
-    setNotice({ kind: "info", text: `Documento firmado y guardado en ${path}` });
+    setNotice({ kind: "info", text: t("Documento firmado y guardado en {path}", { path }) });
     await pdf.call("close", [tab.id]);
   }
 
@@ -237,24 +288,25 @@ export default function App() {
     const paths = await pickConvertible();
     if (!paths.length) return;
     const isImage = (p: string) => /\.(png|jpe?g|gif|bmp|tiff?)$/i.test(p);
-    setNotice({ kind: "info", text: "Convirtiendo…" });
+    const converting = t("Convirtiendo…");
+    setNotice({ kind: "info", text: converting });
     for (const path of paths.filter((p) => !isImage(p))) {
       try {
         await openBytes(await convertDocument(path), `${fileName(path).replace(/\.[^.]+$/, "")}.pdf`);
       } catch (e) {
-        showError(`No se pudo convertir ${fileName(path)}: ${message(e)}`);
+        showError(t("No se pudo convertir {name}: {error}", { name: fileName(path), error: message(e) }));
       }
     }
     const images = paths.filter(isImage);
     if (images.length) {
       try {
         const bytes = await pdf.call("imagesToPdf", [await Promise.all(images.map(readFile))]);
-        await openBytes(bytes, images.length === 1 ? `${fileName(images[0]).replace(/\.[^.]+$/, "")}.pdf` : "Imágenes.pdf");
+        await openBytes(bytes, images.length === 1 ? `${fileName(images[0]).replace(/\.[^.]+$/, "")}.pdf` : t("Imágenes.pdf"));
       } catch (e) {
-        showError(`No se pudieron convertir las imágenes: ${message(e)}`);
+        showError(t("No se pudieron convertir las imágenes: {error}", { error: message(e) }));
       }
     }
-    setNotice((n) => (n?.text === "Convirtiendo…" ? null : n));
+    setNotice((n) => (n?.text === converting ? null : n));
   }
 
   async function convertDocument(path: string): Promise<Uint8Array> {
@@ -266,12 +318,12 @@ export default function App() {
         return new Uint8Array(await invoke<ArrayBuffer>("office_to_pdf", { path }));
       } catch (e) {
         if (!own) throw e;
-        showError(`Microsoft Office no pudo convertir ${fileName(path)} (${message(e)}); se ha usado el conversor propio.`);
+        showError(t("Microsoft Office no pudo convertir {name} ({error}); se ha usado el conversor propio.", { name: fileName(path), error: message(e) }));
       }
     }
     if (own) return pdf.call("convertToPdf", [await readFile(path), own, fileName(path)]);
     const needed = app === "powerpoint" ? "PowerPoint" : app === "excel" ? "Excel" : "Word";
-    throw new Error(`para convertir archivos .${ext} hace falta Microsoft ${needed} instalado (sin Office se convierten .docx, .xlsx y .txt)`);
+    throw new Error(t("para convertir archivos .{ext} hace falta Microsoft {app} instalado (sin Office se convierten .docx, .xlsx y .txt)", { ext, app: needed }));
   }
 
   /** Guarda una copia derivada del documento (no cambia la pestaña). */
@@ -280,22 +332,23 @@ export default function App() {
       const path = await pickSavePath(tab.path ? joinPath(dirName(tab.path), suggested) : suggested);
       if (!path) return;
       await writeFile(path, bytes);
-      setNotice({ kind: "info", text: `Copia guardada en ${path}` });
+      setNotice({ kind: "info", text: t("Copia guardada en {path}", { path }) });
     } catch (e) {
-      showError(`No se pudo guardar la copia: ${message(e)}`);
+      showError(t("No se pudo guardar la copia: {error}", { error: message(e) }));
     }
   }
 
   /** Pregunta qué hacer con los cambios sin guardar. Devuelve false si el usuario cancela. */
   async function confirmDiscard(tab: Tab): Promise<boolean> {
     if (!tab.dirty && tab.path) return true;
-    const answer = await dialog(`¿Guardar los cambios de «${tab.name}» antes de cerrar?`, {
-      title: "Cambios sin guardar",
+    const [yes, no] = [t("Guardar"), t("No guardar")];
+    const answer = await dialog(t("¿Guardar los cambios de «{name}» antes de cerrar?", { name: tab.name }), {
+      title: t("Cambios sin guardar"),
       kind: "warning",
-      buttons: { yes: "Guardar", no: "No guardar", cancel: "Cancelar" },
+      buttons: { yes, no, cancel: t("Cancelar") },
     });
-    if (answer === "Guardar") return save(tab, false);
-    return answer === "No guardar";
+    if (answer === yes) return save(tab, false);
+    return answer === no;
   }
 
   // --- Varias ventanas ------------------------------------------------------------
@@ -311,7 +364,7 @@ export default function App() {
       minHeight: 600,
       ...(position ? { x: Math.max(0, position.x), y: Math.max(0, position.y) } : {}),
     });
-    win.once("tauri://error", (e) => showError(`No se pudo abrir la ventana: ${message(e.payload)}`));
+    win.once("tauri://error", (e) => showError(t("No se pudo abrir la ventana: {error}", { error: message(e.payload) })));
     return win;
   }
 
@@ -327,7 +380,7 @@ export default function App() {
       // Solo cuando la ventana nueva existe se quita de esta
       win.once("tauri://created", () => dropTab(tab.id));
     } catch (e) {
-      showError(`No se pudo mover a otra ventana: ${message(e)}`);
+      showError(t("No se pudo mover a otra ventana: {error}", { error: message(e) }));
     }
   }
 
@@ -338,7 +391,7 @@ export default function App() {
     const rest = current.filter((t) => t.id !== id);
     setTabs(rest);
     setActiveId((a) => (a === id ? (rest[Math.min(index, rest.length - 1)]?.id ?? null) : a));
-    await pdf.call("close", [id]).catch((e) => showError(`Error al cerrar el documento: ${message(e)}`));
+    await pdf.call("close", [id]).catch((e) => showError(t("Error al cerrar el documento: {error}", { error: message(e) })));
   }
 
   /**
@@ -395,13 +448,13 @@ export default function App() {
         const { needsPassword } = await pdf.call("open", [id, bytes]);
         const path = params.get("path") || null;
         if (needsPassword && path) return setPasswordPrompt({ id, path, wrong: false });
-        await addTab(id, path, params.get("name") ?? "Documento.pdf");
+        await addTab(id, path, params.get("name") ?? t("Documento.pdf"));
         if (params.get("dirty") === "1") {
           await pdf.call("markUnsaved", [id]);
           setDirty(id, true);
         }
       } catch (e) {
-        showError(`No se pudo abrir el documento en esta ventana: ${message(e)}`);
+        showError(t("No se pudo abrir el documento en esta ventana: {error}", { error: message(e) }));
       }
     })();
   }, [addTab, setDirty, showError]);
@@ -422,7 +475,7 @@ export default function App() {
     try {
       await pdf.call("close", [id]);
     } catch (e) {
-      showError(`Error al cerrar el documento: ${message(e)}`);
+      showError(t("Error al cerrar el documento: {error}", { error: message(e) }));
     }
   }
 
@@ -435,7 +488,7 @@ export default function App() {
       else if (type === "drop") {
         setDragging(false);
         const pdfs = event.payload.paths.filter((p) => p.toLowerCase().endsWith(".pdf"));
-        if (pdfs.length < event.payload.paths.length) showError("Solo se pueden abrir archivos PDF.");
+        if (pdfs.length < event.payload.paths.length) showError(t("Solo se pueden abrir archivos PDF."));
         (async () => {
           for (const p of pdfs) await openPath(p);
         })();
@@ -484,7 +537,7 @@ export default function App() {
       try {
         for (const path of await invoke<string[]>("take_pending_files")) await openPathRef.current(path);
       } catch (e) {
-        showError(`No se pudieron abrir los archivos: ${message(e)}`);
+        showError(t("No se pudieron abrir los archivos: {error}", { error: message(e) }));
       }
     };
     const unlisten = thisWindow.listen("open-files", take);
@@ -494,14 +547,23 @@ export default function App() {
       try {
         const bytes = new Uint8Array(await invoke<ArrayBuffer>("take_stashed", { token: p.token }));
         const target = activeRef.current;
-        if (!target) return openBytes(bytes, `Páginas de ${p.from}`);
+        if (!target) return openBytes(bytes, t("Páginas de {name}", { name: p.from }));
         const at = dropIndexAt(p.x, p.y, (await pdf.call("info", [target])).pages.length);
         await pdf.call("insertPdf", [target, at, bytes]);
         setCommand((c) => ({ name: "refresh", n: (c?.n ?? 0) + 1, target }));
-        setNotice({ kind: "info", text: `${p.count === 1 ? "1 página copiada" : `${p.count} páginas copiadas`} de ${p.from} ${at === 0 ? "al principio" : `detrás de la página ${at}`}` });
+        const params = { n: p.count, from: p.from, at };
+        const text =
+          p.count === 1
+            ? at === 0
+              ? t("1 página copiada de {from} al principio", params)
+              : t("1 página copiada de {from} detrás de la página {at}", params)
+            : at === 0
+              ? t("{n} páginas copiadas de {from} al principio", params)
+              : t("{n} páginas copiadas de {from} detrás de la página {at}", params);
+        setNotice({ kind: "info", text });
         await thisWindow.setFocus();
       } catch (e) {
-        showError(`No se pudieron recibir las páginas: ${message(e)}`);
+        showError(t("No se pudieron recibir las páginas: {error}", { error: message(e) }));
       }
     });
     // Los archivos con los que se arrancó la app los recoge la ventana principal
@@ -553,25 +615,25 @@ export default function App() {
   return (
     <div className="app">
       <header className="tabbar" ref={tabbarRef}>
-        <button className="primary" onClick={openDialog} title="Abrir (⌘O)">
-          Abrir
+        <button className="primary" onClick={openDialog} title={t("Abrir (⌘O)")}>
+          {t("Abrir")}
         </button>
         <button className="tabbar-extra" onClick={() => setMerging(true)}>
-          Combinar archivos…
+          {t("Combinar archivos…")}
         </button>
-        <button className="tabbar-extra" onClick={createPdf} title="Desde Word, Excel, PowerPoint, texto o imágenes">
-          Crear PDF…
+        <button className="tabbar-extra" onClick={createPdf} title={t("Desde Word, Excel, PowerPoint, texto o imágenes")}>
+          {t("Crear PDF…")}
         </button>
-        <button className="tabbar-extra" onClick={() => setFolderSearch(true)} title="Buscar un texto en todos los PDF de una carpeta (⇧⌘F)">
-          Buscar en carpeta…
+        <button className="tabbar-extra" onClick={() => setFolderSearch(true)} title={t("Buscar un texto en todos los PDF de una carpeta (⇧⌘F)")}>
+          {t("Buscar en carpeta…")}
         </button>
-        <button className="tabbar-extra" onClick={() => setBatch(true)} title="Aplicar OCR, marca de agua, numeración, contraseña… a muchos PDF de una vez">
-          Procesar varios…
+        <button className="tabbar-extra" onClick={() => setBatch(true)} title={t("Aplicar OCR, marca de agua, numeración, contraseña… a muchos PDF de una vez")}>
+          {t("Procesar varios…")}
         </button>
         {recent.length > 0 && (
           <div className="menu-anchor">
             <button className={recentMenu ? "is-on" : ""} onClick={() => setRecentMenu(!recentMenu)} aria-haspopup="menu" aria-expanded={recentMenu}>
-              Recientes ▾
+              {t("Recientes ▾")}
             </button>
             {recentMenu && (
               <div className="menu menu-left" role="menu" onClick={() => setRecentMenu(false)}>
@@ -596,13 +658,13 @@ export default function App() {
                 e.preventDefault();
                 setTabMenu({ id: tab.id, x: e.clientX, y: e.clientY });
               }}
-              title={`${tab.path ?? "Documento nuevo sin guardar"}\nArrastra la pestaña fuera de la barra para abrirla en otra ventana`}
+              title={`${tab.path ?? t("Documento nuevo sin guardar")}\n${t("Arrastra la pestaña fuera de la barra para abrirla en otra ventana")}`}
             >
               <span className="tab-name">{tab.info.title || tab.name}</span>
-              {(tab.dirty || !tab.path) && <span className="tab-dirty" title="Cambios sin guardar">●</span>}
+              {(tab.dirty || !tab.path) && <span className="tab-dirty" title={t("Cambios sin guardar")}>●</span>}
               <button
                 className="tab-close"
-                title="Cerrar"
+                title={t("Cerrar")}
                 onClick={(e) => {
                   e.stopPropagation();
                   closeTab(tab.id);
@@ -614,7 +676,7 @@ export default function App() {
           ))}
         </nav>
         <div className="spacer" />
-        <button onClick={() => setPrefsOpen(true)} title="Preferencias (⌘,)" aria-label="Preferencias">
+        <button onClick={() => setPrefsOpen(true)} title={t("Preferencias (⌘,)")} aria-label={t("Preferencias")}>
           ⚙
         </button>
       </header>
@@ -630,13 +692,13 @@ export default function App() {
         {tabs.length === 0 && (
           <div className="empty">
             <h1>MegaPDF</h1>
-            <p>Abre un PDF o arrástralo a la ventana.</p>
+            <p>{t("Abre un PDF o arrástralo a la ventana.")}</p>
             <button className="primary large" onClick={openDialog}>
-              Abrir PDF…
+              {t("Abrir PDF…")}
             </button>
             {recent.length > 0 && (
               <div className="recent">
-                <h2>Recientes</h2>
+                <h2>{t("Recientes")}</h2>
                 <ul>
                   {recent.map((p) => (
                     <li key={p}>
@@ -686,20 +748,20 @@ export default function App() {
         ))}
       </main>
 
-      {dragging && <div className="drop-overlay">Suelta para abrir</div>}
+      {dragging && <div className="drop-overlay">{t("Suelta para abrir")}</div>}
       {tabDrag?.detach && (
         <div className="drag-ghost" style={{ left: tabDrag.x + 12, top: tabDrag.y + 12 }}>
-          Soltar para abrir en una ventana nueva
+          {t("Soltar para abrir en una ventana nueva")}
         </div>
       )}
       {tabMenu && (
         <div className="modal-backdrop menu-backdrop" onMouseDown={() => setTabMenu(null)}>
           <div className="menu context-menu" role="menu" style={{ left: tabMenu.x, top: tabMenu.y }} onMouseDown={(e) => e.stopPropagation()} onClick={() => setTabMenu(null)}>
             <button role="menuitem" onClick={() => moveToNewWindow(tabMenu.id)}>
-              Mover a una ventana nueva
+              {t("Mover a una ventana nueva")}
             </button>
             <button role="menuitem" onClick={() => closeTab(tabMenu.id)}>
-              Cerrar pestaña
+              {t("Cerrar pestaña")}
             </button>
           </div>
         </div>
@@ -714,6 +776,7 @@ export default function App() {
           onSave={(p) => {
             try {
               savePrefs(p);
+              if (p.language && p.language !== prefs.language) applyLanguage(p.language);
               setPrefs(p);
               setPrefsOpen(false);
             } catch (e) {
@@ -731,6 +794,7 @@ export default function App() {
         />
       )}
 
+      {askLanguage && <LanguageDialog initial={askLanguage} onChoose={chooseLanguage} />}
       {batch && <BatchDialog onClose={() => setBatch(false)} />}
       {folderSearch && (
         <FolderSearchDialog
@@ -747,7 +811,7 @@ export default function App() {
           onClose={() => setMerging(false)}
           onMerged={(bytes) => {
             setMerging(false);
-            openBytes(bytes, "Combinado.pdf");
+            openBytes(bytes, t("Combinado.pdf"));
           }}
           onError={showError}
         />
@@ -762,16 +826,16 @@ export default function App() {
               submitPassword(new FormData(e.currentTarget).get("password") as string);
             }}
           >
-            <h2>Documento protegido</h2>
-            <p>{fileName(passwordPrompt.path)} necesita contraseña para abrirse.</p>
-            <input name="password" type="password" autoFocus placeholder="Contraseña" key={String(passwordPrompt.wrong)} />
-            {passwordPrompt.wrong && <p className="error-text">Contraseña incorrecta.</p>}
+            <h2>{t("Documento protegido")}</h2>
+            <p>{t("{name} necesita contraseña para abrirse.", { name: fileName(passwordPrompt.path) })}</p>
+            <input name="password" type="password" autoFocus placeholder={t("Contraseña")} key={String(passwordPrompt.wrong)} />
+            {passwordPrompt.wrong && <p className="error-text">{t("Contraseña incorrecta.")}</p>}
             <div className="modal-actions">
               <button type="button" onClick={cancelPassword}>
-                Cancelar
+                {t("Cancelar")}
               </button>
               <button type="submit" className="primary">
-                Abrir
+                {t("Abrir")}
               </button>
             </div>
           </form>

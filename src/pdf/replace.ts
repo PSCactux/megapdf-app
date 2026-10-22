@@ -1,5 +1,6 @@
 import type * as mupdf from "mupdf";
 import * as content from "./content";
+import { t } from "../i18n";
 
 /**
  * Buscar y reemplazar texto. Se trabaja por líneas: cada línea con alguna coincidencia se
@@ -64,7 +65,7 @@ export function replaceLines(doc: mupdf.PDFDocument, chosen: LineMatch[], find: 
         continue;
       }
       const line = content.readContent(page, p).lines.find((l) => l.text === c.text && near(l.rect, c.rect));
-      if (!line) throw new Error(`La línea «${c.text}» de la página ${p + 1} ha cambiado; vuelve a buscar`);
+      if (!line) throw new Error(t("La línea «{linea}» de la página {n} ha cambiado; vuelve a buscar", { linea: c.text, n: p + 1 }));
       const r = replaceIn(line.text, find, replacement, o);
       content.replaceLine(doc, page, line, r.text, line.style);
       total += r.count;

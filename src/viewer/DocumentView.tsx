@@ -66,6 +66,10 @@ import { REAL_SIZE, type Scale } from "../annot/measure";
 import { FindReplaceDialog } from "../edit/FindReplaceDialog";
 import { FormDataDialog } from "../forms/FormDataDialog";
 import { HeadingsDialog } from "./HeadingsDialog";
+import { t, tk } from "../i18n";
+
+/** Texto de un error para mostrarlo al usuario. */
+const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 type Props = {
   docId: string;
@@ -352,19 +356,22 @@ export function DocumentView({
 
   async function copySelection() {
     if (!textSel) return;
-    if (!perms.copy) return onError("El autor de este documento no permite copiar su contenido.");
+    if (!perms.copy) return onError(t("El autor de este documento no permite copiar su contenido."));
     try {
       await navigator.clipboard.writeText(textSel.text);
     } catch (e) {
-      onError(`No se pudo copiar al portapapeles: ${e instanceof Error ? e.message : e}`);
+      onError(t("No se pudo copiar al portapapeles: {error}", { error: errorText(e) }));
     }
   }
 
   async function applyRedactions() {
-    const warning = signatures.length ? " Además, las firmas del documento dejarán de ser válidas." : "";
+    const n = redactMarks.length;
+    const warning = signatures.length ? " " + t("Además, las firmas del documento dejarán de ser válidas.") : "";
     const ok = await confirmAction(
-      `Se borrará para siempre lo marcado (${redactMarks.length} ${redactMarks.length === 1 ? "marca" : "marcas"}): texto, imágenes y dibujos cubiertos. Puedes deshacerlo hasta que guardes.${warning}`,
-      "Aplicar redacciones",
+      (n === 1
+        ? t("Se borrará para siempre lo marcado ({n} marca): texto, imágenes y dibujos cubiertos. Puedes deshacerlo hasta que guardes.", { n })
+        : t("Se borrará para siempre lo marcado ({n} marcas): texto, imágenes y dibujos cubiertos. Puedes deshacerlo hasta que guardes.", { n })) + warning,
+      t("Aplicar redacciones"),
     );
     if (ok) await doc.applyRedactions();
   }
@@ -400,7 +407,8 @@ export function DocumentView({
     try {
       const base = baseName(name);
       const groups = spec.separate ? spec.pages.map((p) => [p]) : [spec.pages];
-      const label = (pages: number[]) => `${base} (${pages.length === 1 ? "página" : "páginas"} ${describePages(pages)}).pdf`;
+      const label = (pages: number[]) =>
+        pages.length === 1 ? t("{name} (página {pages}).pdf", { name: base, pages: describePages(pages) }) : t("{name} (páginas {pages}).pdf", { name: base, pages: describePages(pages) });
       if (spec.destination === "file" && spec.separate) {
         const folder = await pickFolder();
         if (!folder) return;
@@ -416,12 +424,12 @@ export function DocumentView({
       setPageDialog(null);
       setPageSel([]);
     } catch (e) {
-      onError(`No se pudieron extraer las páginas: ${e instanceof Error ? e.message : e}`);
+      onError(t("No se pudieron extraer las páginas: {error}", { error: errorText(e) }));
     }
   }
 
   function openPrint() {
-    if (!perms.print) return onError("El autor de este documento no permite imprimirlo.");
+    if (!perms.print) return onError(t("El autor de este documento no permite imprimirlo."));
     setPrintOpen(true);
   }
 
@@ -432,13 +440,13 @@ export function DocumentView({
       setPrintLayout(layout);
       setPrintImages(images);
     } catch (e) {
-      onError(`No se pudo preparar la impresión: ${e instanceof Error ? e.message : e}`);
+      onError(t("No se pudo preparar la impresión: {error}", { error: errorText(e) }));
     }
   }
 
   /** Compara con otra versión en PDF o con el Word del que salió (convertido con el conversor propio). */
   async function startCompare(kind: "pdf" | "word" = "pdf") {
-    const path = kind === "pdf" ? (await pickPdfs())[0] : await open({ multiple: false, filters: [{ name: "Documento de Word", extensions: ["docx"] }] });
+    const path = kind === "pdf" ? (await pickPdfs())[0] : await open({ multiple: false, filters: [{ name: t("Documento de Word"), extensions: ["docx"] }] });
     if (!path) return;
     try {
       const previous = kind === "pdf" ? await readPdf(path) : await pdf.call("convertToPdf", [await readFile(path), "docx", fileName(path)]);
@@ -450,7 +458,7 @@ export function DocumentView({
       setMode("read");
       setCompare({ name: fileName(path), changes, active: null, oldId, oldPages, side: true });
     } catch (e) {
-      onError(`No se pudo comparar: ${e instanceof Error ? e.message : e}`);
+      onError(t("No se pudo comparar: {error}", { error: errorText(e) }));
     }
   }
 
@@ -469,7 +477,7 @@ export function DocumentView({
       const bytes = kind === "docx" ? await doc.exportDocx() : kind === "xlsx" ? await doc.exportXlsx() : new TextEncoder().encode(await doc.exportText());
       await onSaveCopy(bytes, `${baseName(name)}.${kind}`);
     } catch (e) {
-      onError(`No se pudo exportar: ${e instanceof Error ? e.message : e}`);
+      onError(t("No se pudo exportar: {error}", { error: errorText(e) }));
     }
   }
 
@@ -484,7 +492,7 @@ export function DocumentView({
       }
       setConvertDialog(null);
     } catch (e) {
-      onError(`No se pudieron exportar las imágenes: ${e instanceof Error ? e.message : e}`);
+      onError(t("No se pudieron exportar las imágenes: {error}", { error: errorText(e) }));
     }
   }
 
@@ -536,7 +544,7 @@ export function DocumentView({
     try {
       await onSigned(await doc.sign({ ...choice, page, target }));
     } catch (e) {
-      onError(`No se pudo firmar: ${e instanceof Error ? e.message : e}`);
+      onError(t("No se pudo firmar: {error}", { error: errorText(e) }));
     } finally {
       setSigning(false);
     }
@@ -544,10 +552,10 @@ export function DocumentView({
 
   // --- Edición de contenido ----------------------------------------------------
 
-  async function chooseEditTool(t: EditTool) {
+  async function chooseEditTool(next: EditTool) {
     setEditSel(null);
-    if (t !== "image") {
-      setEditTool(t);
+    if (next !== "image") {
+      setEditTool(next);
       return;
     }
     // Primero se elige la imagen; luego se coloca con un clic
@@ -560,7 +568,7 @@ export function DocumentView({
       setPendingImage({ bytes, url: URL.createObjectURL(blob), width: bitmap.width * 0.75, height: bitmap.height * 0.75 });
       setEditTool("image");
     } catch (e) {
-      onError(`No se pudo abrir la imagen: ${e instanceof Error ? e.message : e}`);
+      onError(t("No se pudo abrir la imagen: {error}", { error: errorText(e) }));
     }
   }
 
@@ -588,8 +596,8 @@ export function DocumentView({
   async function flatten() {
     if (
       await confirmAction(
-        "Los campos y comentarios pasarán a ser contenido fijo de las páginas y ya no se podrán editar. Puedes deshacerlo antes de guardar.",
-        "Aplanar",
+        t("Los campos y comentarios pasarán a ser contenido fijo de las páginas y ya no se podrán editar. Puedes deshacerlo antes de guardar."),
+        t("Aplanar"),
       )
     ) {
       await doc.flatten();
@@ -627,7 +635,7 @@ export function DocumentView({
       if (hits.length) showHit(hits[startIndex]);
     } catch (e) {
       setSearch({ query, hits: [], index: 0, busy: false });
-      onError(`Error al buscar: ${e instanceof Error ? e.message : e}`);
+      onError(t("Error al buscar: {error}", { error: errorText(e) }));
     }
   }
 
@@ -652,14 +660,14 @@ export function DocumentView({
   }
 
   async function paste() {
-    if (!perms.edit) return onError("El autor de este documento no permite modificar su contenido.");
+    if (!perms.edit) return onError(t("El autor de este documento no permite modificar su contenido."));
     let clip;
     try {
       clip = await readClipboard();
     } catch (e) {
-      return onError(`No se pudo leer el portapapeles: ${e instanceof Error ? e.message : e}`);
+      return onError(t("No se pudo leer el portapapeles: {error}", { error: errorText(e) }));
     }
-    if (!clip) return onError("El portapapeles no tiene texto ni imágenes para pegar.");
+    if (!clip) return onError(t("El portapapeles no tiene texto ni imágenes para pegar."));
     const page = pointerAt.current?.page ?? current;
     const size = info.pages[page];
     const at = pointerAt.current?.at ?? [size.width / 2, size.height / 2];
@@ -706,21 +714,23 @@ export function DocumentView({
       const rgba = new Uint8Array(w * h * 4);
       for (let y = 0; y < h; y++) rgba.set(r.pixels.subarray(((y0 + y) * r.width + x0) * 4, ((y0 + y) * r.width + x0 + w) * 4), y * w * 4);
       await writeImage(await TauriImage.new(rgba, w, h));
-      onNotice("Zona copiada como imagen: ya la puedes pegar en otro programa.");
+      onNotice(t("Zona copiada como imagen: ya la puedes pegar en otro programa."));
     } catch (e) {
-      onError(`No se pudo copiar la zona: ${e instanceof Error ? e.message : e}`);
+      onError(t("No se pudo copiar la zona: {error}", { error: errorText(e) }));
     }
   }
 
   /** Un enlace interno lleva a su página; uno externo se abre en el navegador tras confirmarlo. */
   async function followLink(l: PageLink) {
     if (l.page !== null) return goTo(l.page);
-    if (!/^(https?|mailto|tel):/i.test(l.uri)) return onError(`Este enlace no se puede abrir desde MegaPDF: ${l.uri}`);
-    if (!(await confirmAction(`¿Abrir ${l.uri.replace(/^mailto:/, "")} ${l.uri.startsWith("mailto:") ? "en el correo" : "en el navegador"}?`, "Abrir"))) return;
+    if (!/^(https?|mailto|tel):/i.test(l.uri)) return onError(t("Este enlace no se puede abrir desde MegaPDF: {url}", { url: l.uri }));
+    const target = l.uri.replace(/^mailto:/, "");
+    const question = l.uri.startsWith("mailto:") ? t("¿Abrir {target} en el correo?", { target }) : t("¿Abrir {target} en el navegador?", { target });
+    if (!(await confirmAction(question, t("Abrir")))) return;
     try {
       await openUrl(l.uri);
     } catch (e) {
-      onError(`No se pudo abrir el enlace: ${e instanceof Error ? e.message : e}`);
+      onError(t("No se pudo abrir el enlace: {error}", { error: errorText(e) }));
     }
   }
 
@@ -735,14 +745,14 @@ export function DocumentView({
       try {
         setDocDialog({ kind, cropped: await pdf.call("croppedPages", [docId]) });
       } catch (e) {
-        onError(`No se pudieron leer las páginas: ${e instanceof Error ? e.message : e}`);
+        onError(t("No se pudieron leer las páginas: {error}", { error: errorText(e) }));
       }
     } else if (kind === "replace") setDocDialog({ kind, pages: pages ?? (mode === "organize" && pageSel.length ? pageSel : [current]) });
     else setDocDialog({ kind });
   }
 
   async function duplicatePages(pages: number[]) {
-    if (!perms.assemble) return onError("El autor de este documento no permite cambiar sus páginas.");
+    if (!perms.assemble) return onError(t("El autor de este documento no permite cambiar sus páginas."));
     const n = await doc.duplicatePages(pages);
     if (n && mode === "organize") setPageSel(pages.map((_, k) => Math.max(...pages) + 1 + k));
   }
@@ -751,7 +761,7 @@ export function DocumentView({
   async function exportEmbeddedImages() {
     try {
       const images = await pdf.call("embeddedImages", [docId]);
-      if (!images.length) return onNotice("Este documento no tiene imágenes incrustadas.");
+      if (!images.length) return onNotice(t("Este documento no tiene imágenes incrustadas."));
       const folder = await pickFolder();
       if (!folder) return;
       const count = new Map<number, number>();
@@ -760,9 +770,9 @@ export function DocumentView({
         count.set(img.page, k);
         await writeFile(joinPath(folder, `${baseName(name)}-p${img.page + 1}-${k}.${img.ext}`), img.bytes);
       }
-      onNotice(`${images.length} ${images.length === 1 ? "imagen guardada" : "imágenes guardadas"} en ${folder}`);
+      onNotice(images.length === 1 ? t("{n} imagen guardada en {folder}", { n: images.length, folder }) : t("{n} imágenes guardadas en {folder}", { n: images.length, folder }));
     } catch (e) {
-      onError(`No se pudieron exportar las imágenes: ${e instanceof Error ? e.message : e}`);
+      onError(t("No se pudieron exportar las imágenes: {error}", { error: errorText(e) }));
     }
   }
 
@@ -771,7 +781,7 @@ export function DocumentView({
       try {
         if ((await doc.addAttachment(fileName(path), await readFile(path))) === null) return;
       } catch (e) {
-        return onError(`No se pudo leer ${fileName(path)}: ${e instanceof Error ? e.message : e}`);
+        return onError(t("No se pudo leer {name}: {error}", { name: fileName(path), error: errorText(e) }));
       }
     }
   }
@@ -782,9 +792,9 @@ export function DocumentView({
       const path = await pickSavePath(a.name);
       if (!path) return;
       await writeFile(path, bytes);
-      onNotice(`Adjunto guardado en ${path}`);
+      onNotice(t("Adjunto guardado en {path}", { path }));
     } catch (e) {
-      onError(`No se pudo guardar el adjunto: ${e instanceof Error ? e.message : e}`);
+      onError(t("No se pudo guardar el adjunto: {error}", { error: errorText(e) }));
     }
   }
 
@@ -792,14 +802,14 @@ export function DocumentView({
     try {
       onOpenBytes(await pdf.call("attachmentContents", [docId, a.key]), a.name);
     } catch (e) {
-      onError(`No se pudo abrir el adjunto: ${e instanceof Error ? e.message : e}`);
+      onError(t("No se pudo abrir el adjunto: {error}", { error: errorText(e) }));
     }
   }
 
   /** Marca la página y deja escribiendo el nombre del marcador nuevo. */
   async function addBookmark(page: number) {
-    if (!perms.assemble) return onError("El autor de este documento no permite cambiar sus marcadores.");
-    const path = await doc.addBookmark(`Página ${page + 1}`, page);
+    if (!perms.assemble) return onError(t("El autor de este documento no permite cambiar sus marcadores."));
+    const path = await doc.addBookmark(t("Página {n}", { n: page + 1 }), page);
     if (!path) return;
     setSidebar("outline");
     setRenamingBookmark(path.join("."));
@@ -864,7 +874,7 @@ export function DocumentView({
       const el = document.activeElement;
       if (!textSel || el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return;
       e.preventDefault();
-      if (!perms.copy) return onError("El autor de este documento no permite copiar su contenido.");
+      if (!perms.copy) return onError(t("El autor de este documento no permite copiar su contenido."));
       e.clipboardData?.setData("text/plain", textSel.text);
     };
     document.addEventListener("copy", onCopy);
@@ -998,22 +1008,22 @@ export function DocumentView({
       <div className="toolbar">
         <div className="segmented" role="tablist">
           <button role="tab" aria-selected={mode === "read"} className={mode === "read" ? "is-on" : ""} onClick={() => setMode("read")}>
-            Leer
+            {t("Leer")}
           </button>
           <button
             role="tab"
             aria-selected={mode === "organize"}
-            title="Organizar páginas"
+            title={t("Organizar páginas")}
             className={mode === "organize" ? "is-on" : ""}
             disabled={!perms.assemble}
             onClick={() => setMode("organize")}
           >
-            Organizar
+            {t("Organizar")}
           </button>
           <button
             role="tab"
             aria-selected={mode === "form"}
-            title="Preparar formulario"
+            title={t("Preparar formulario")}
             className={mode === "form" ? "is-on" : ""}
             disabled={!perms.edit}
             onClick={() => {
@@ -1021,12 +1031,12 @@ export function DocumentView({
               chooseTool("select");
             }}
           >
-            Formulario
+            {t("Formulario")}
           </button>
           <button
             role="tab"
             aria-selected={mode === "edit"}
-            title="Editar texto, imágenes, encabezados y marcas de agua"
+            title={t("Editar texto, imágenes, encabezados y marcas de agua")}
             className={mode === "edit" ? "is-on" : ""}
             disabled={!perms.edit}
             onClick={() => {
@@ -1034,12 +1044,12 @@ export function DocumentView({
               chooseTool("select");
             }}
           >
-            Editar
+            {t("Editar")}
           </button>
           <button
             role="tab"
             aria-selected={mode === "protect"}
-            title="Redactar, contraseñas, información oculta y tamaño"
+            title={t("Redactar, contraseñas, información oculta y tamaño")}
             className={mode === "protect" ? "is-on" : ""}
             disabled={!!doc.security?.restricted}
             onClick={() => {
@@ -1047,34 +1057,34 @@ export function DocumentView({
               chooseTool("select");
             }}
           >
-            Proteger
+            {t("Proteger")}
           </button>
         </div>
         {mode !== "read" ? (
           <div className="group">
-            <button disabled={!history.canUndo} onClick={doc.undo} title={history.undoLabel ? `Deshacer: ${history.undoLabel} (⌘Z)` : "Deshacer (⌘Z)"}>
-              ↶ Deshacer
+            <button disabled={!history.canUndo} onClick={doc.undo} title={history.undoLabel ? t("Deshacer: {action} (⌘Z)", { action: history.undoLabel }) : t("Deshacer (⌘Z)")}>
+              {t("↶ Deshacer")}
             </button>
-            <button disabled={!history.canRedo} onClick={doc.redo} title={history.redoLabel ? `Rehacer: ${history.redoLabel} (⇧⌘Z)` : "Rehacer (⇧⌘Z)"}>
-              ↷ Rehacer
+            <button disabled={!history.canRedo} onClick={doc.redo} title={history.redoLabel ? t("Rehacer: {action} (⇧⌘Z)", { action: history.redoLabel }) : t("Rehacer (⇧⌘Z)")}>
+              {t("↷ Rehacer")}
             </button>
             <div className="spacer" />
           </div>
         ) : (
           <>
             <div className="group">
-              <button className={sidebar === "thumbs" ? "is-on" : ""} onClick={() => setSidebar(sidebar === "thumbs" ? null : "thumbs")} title="Miniaturas">
+              <button className={sidebar === "thumbs" ? "is-on" : ""} onClick={() => setSidebar(sidebar === "thumbs" ? null : "thumbs")} title={t("Miniaturas")}>
                 ▦
               </button>
-              <button className={sidebar === "outline" ? "is-on" : ""} onClick={() => setSidebar(sidebar === "outline" ? null : "outline")} title="Marcadores">
+              <button className={sidebar === "outline" ? "is-on" : ""} onClick={() => setSidebar(sidebar === "outline" ? null : "outline")} title={t("Marcadores")}>
                 ☰
               </button>
-              <button className={sidebar === "attachments" ? "is-on" : ""} onClick={() => setSidebar(sidebar === "attachments" ? null : "attachments")} title="Archivos adjuntos">
+              <button className={sidebar === "attachments" ? "is-on" : ""} onClick={() => setSidebar(sidebar === "attachments" ? null : "attachments")} title={t("Archivos adjuntos")}>
                 📎
               </button>
             </div>
             <div className="group">
-              <button onClick={() => goTo(current - 1)} disabled={current === 0} title="Página anterior">
+              <button onClick={() => goTo(current - 1)} disabled={current === 0} title={t("Página anterior")}>
                 ‹
               </button>
               <form
@@ -1086,34 +1096,34 @@ export function DocumentView({
               >
                 <input className="page-input" value={pageInput} onChange={(e) => setPageInput(e.target.value)} onFocus={(e) => e.target.select()} />
               </form>
-              <span className="muted">de {info.pages.length}</span>
-              <button onClick={() => goTo(current + 1)} disabled={current === info.pages.length - 1} title="Página siguiente">
+              <span className="muted">{t("de {n}", { n: info.pages.length })}</span>
+              <button onClick={() => goTo(current + 1)} disabled={current === info.pages.length - 1} title={t("Página siguiente")}>
                 ›
               </button>
             </div>
             <div className="group">
-              <button onClick={() => setZoom(stepZoom(effectiveZoom, -1))} title="Reducir (⌘−)">
+              <button onClick={() => setZoom(stepZoom(effectiveZoom, -1))} title={t("Reducir (⌘−)")}>
                 −
               </button>
-              <button className="zoom-label" onClick={() => setZoom(1)} title="Tamaño real (⌘0)" aria-label="Tamaño real">
+              <button className="zoom-label" onClick={() => setZoom(1)} title={t("Tamaño real (⌘0)")} aria-label={t("Tamaño real")}>
                 {Math.round(effectiveZoom * 100)}%
               </button>
-              <button onClick={() => setZoom(stepZoom(effectiveZoom, 1))} title="Ampliar (⌘+)">
+              <button onClick={() => setZoom(stepZoom(effectiveZoom, 1))} title={t("Ampliar (⌘+)")}>
                 +
               </button>
-              <button onClick={() => setZoom(fitWidthZoom(info.pages, viewport.width, viewLayout))}>Ajustar ancho</button>
+              <button onClick={() => setZoom(fitWidthZoom(info.pages, viewport.width, viewLayout))}>{t("Ajustar ancho")}</button>
               <div className="menu-anchor">
                 <button className={viewMenu ? "is-on" : ""} onClick={() => setViewMenu(!viewMenu)} aria-haspopup="menu" aria-expanded={viewMenu}>
-                  Vista ▾
+                  {t("Vista ▾")}
                 </button>
                 {viewMenu && (
                   <div className="menu" role="menu" onClick={() => setViewMenu(false)}>
                     {(
                       [
-                        ["continuous", "Continua"],
-                        ["single", "Página a página"],
-                        ["two", "Dos páginas"],
-                        ["two-cover", "Dos páginas con portada"],
+                        ["continuous", t("Continua")],
+                        ["single", t("Página a página")],
+                        ["two", t("Dos páginas")],
+                        ["two-cover", t("Dos páginas con portada")],
                       ] as const
                     ).map(([v, label]) => (
                       <button key={v} role="menuitemradio" aria-checked={viewLayout === v} onClick={() => changeLayout(v)}>
@@ -1124,9 +1134,9 @@ export function DocumentView({
                     <hr />
                     {(
                       [
-                        ["normal", "Colores normales"],
-                        ["night", "Lectura nocturna"],
-                        ["sepia", "Sepia"],
+                        ["normal", t("Colores normales")],
+                        ["night", t("Lectura nocturna")],
+                        ["sepia", t("Sepia")],
                       ] as const
                     ).map(([t, label]) => (
                       <button key={t} role="menuitemradio" aria-checked={theme === t} onClick={() => onTheme(t)}>
@@ -1136,15 +1146,15 @@ export function DocumentView({
                     ))}
                     <hr />
                     <button role="menuitem" onClick={() => setReadingAloud(true)}>
-                      Leer en voz alta
+                      {t("Leer en voz alta")}
                     </button>
                     <button role="menuitem" onClick={() => setPresenting(true)}>
-                      Presentación (⌘L)
+                      {t("Presentación (⌘L)")}
                     </button>
                   </div>
                 )}
               </div>
-              <button className={snapshot ? "is-on" : ""} aria-pressed={snapshot} onClick={() => setSnapshot(!snapshot)} title="Copiar una zona de la página como imagen">
+              <button className={snapshot ? "is-on" : ""} aria-pressed={snapshot} onClick={() => setSnapshot(!snapshot)} title={t("Copiar una zona de la página como imagen")}>
                 📷
               </button>
             </div>
@@ -1153,7 +1163,7 @@ export function DocumentView({
               <input
                 ref={searchRef}
                 type="search"
-                placeholder="Buscar (⌘F)"
+                placeholder={t("Buscar (⌘F)")}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") runSearch(e.currentTarget.value, e.shiftKey ? -1 : 1);
                   if (e.key === "Escape") {
@@ -1163,17 +1173,17 @@ export function DocumentView({
                 }}
               />
               <span className="muted search-count">
-                {search.busy ? "Buscando…" : search.query ? (search.hits.length ? `${search.index + 1} de ${search.hits.length}` : "Sin resultados") : ""}
+                {search.busy ? t("Buscando…") : search.query ? (search.hits.length ? t("{n} de {total}", { n: search.index + 1, total: search.hits.length }) : t("Sin resultados")) : ""}
               </span>
               {!search.busy && search.query && !search.hits.length && doc.scanned.length > 0 && (
-                <button type="button" className="link-button" onClick={() => setConvertDialog("ocr")} title="Hay páginas escaneadas: su texto aún no se puede buscar">
-                  Reconocer texto
+                <button type="button" className="link-button" onClick={() => setConvertDialog("ocr")} title={t("Hay páginas escaneadas: su texto aún no se puede buscar")}>
+                  {t("Reconocer texto")}
                 </button>
               )}
-              <button type="button" disabled={!search.hits.length} onClick={() => runSearch(search.query, -1)} title="Anterior (⇧↵)">
+              <button type="button" disabled={!search.hits.length} onClick={() => runSearch(search.query, -1)} title={t("Anterior (⇧↵)")}>
                 ˄
               </button>
-              <button type="button" disabled={!search.hits.length} onClick={() => runSearch(search.query, 1)} title="Siguiente (↵)">
+              <button type="button" disabled={!search.hits.length} onClick={() => runSearch(search.query, 1)} title={t("Siguiente (↵)")}>
                 ˅
               </button>
             </div>
@@ -1182,46 +1192,46 @@ export function DocumentView({
         <div className="group">
           <div className="menu-anchor">
             <button className={convertMenu ? "is-on" : ""} onClick={() => setConvertMenu(!convertMenu)} aria-haspopup="menu" aria-expanded={convertMenu}>
-              Herramientas ▾
+              {t("Herramientas ▾")}
             </button>
             {convertMenu && (
               <div className="menu" role="menu" onClick={() => setConvertMenu(false)}>
                 <button role="menuitem" onClick={() => setPageDialog({ kind: "insert" })} disabled={!perms.assemble}>
-                  Insertar páginas…
+                  {t("Insertar páginas…")}
                 </button>
                 <button role="menuitem" onClick={() => setPageDialog({ kind: "extract", pages: [current] })} disabled={!perms.assemble}>
-                  Extraer páginas…
+                  {t("Extraer páginas…")}
                 </button>
                 <button role="menuitem" onClick={() => setConvertDialog("ocr")}>
-                  Reconocer texto (OCR)…
+                  {t("Reconocer texto (OCR)…")}
                 </button>
                 <button role="menuitem" onClick={() => startCompare("pdf")}>
-                  Comparar con una versión anterior…
+                  {t("Comparar con una versión anterior…")}
                 </button>
                 <button role="menuitem" onClick={() => startCompare("word")}>
-                  Comparar con un documento de Word…
+                  {t("Comparar con un documento de Word…")}
                 </button>
                 <button role="menuitem" onClick={() => exportAs("docx")} disabled={!perms.copy}>
-                  Exportar a Word…
+                  {t("Exportar a Word…")}
                 </button>
                 <button role="menuitem" onClick={() => exportAs("xlsx")} disabled={!perms.copy}>
-                  Exportar a Excel…
+                  {t("Exportar a Excel…")}
                 </button>
                 <button role="menuitem" onClick={() => exportAs("txt")} disabled={!perms.copy}>
-                  Exportar a texto…
+                  {t("Exportar a texto…")}
                 </button>
                 <button role="menuitem" onClick={() => setConvertDialog("images")} disabled={!perms.copy}>
-                  Exportar como imágenes…
+                  {t("Exportar como imágenes…")}
                 </button>
                 <button role="menuitem" onClick={exportEmbeddedImages} disabled={!perms.copy}>
-                  Exportar las imágenes del documento…
+                  {t("Exportar las imágenes del documento…")}
                 </button>
                 <hr />
                 <button role="menuitem" onClick={() => openDocDialog("crop")} disabled={!perms.assemble}>
-                  Recortar páginas…
+                  {t("Recortar páginas…")}
                 </button>
                 <button role="menuitem" onClick={() => openDocDialog("replace")} disabled={!perms.assemble}>
-                  Sustituir páginas…
+                  {t("Sustituir páginas…")}
                 </button>
                 <button
                   role="menuitem"
@@ -1231,28 +1241,28 @@ export function DocumentView({
                     setFindReplace(true);
                   }}
                 >
-                  Buscar y reemplazar texto…
+                  {t("Buscar y reemplazar texto…")}
                 </button>
                 <button role="menuitem" disabled={!perms.assemble} onClick={() => setHeadingsOpen(true)}>
-                  Marcadores desde los títulos…
+                  {t("Marcadores desde los títulos…")}
                 </button>
                 <button role="menuitem" disabled={!fields.length} onClick={() => setFormDataOpen(true)}>
-                  Datos del formulario…
+                  {t("Datos del formulario…")}
                 </button>
                 <button role="menuitem" onClick={() => openDocDialog("properties")}>
-                  Propiedades del documento…
+                  {t("Propiedades del documento…")}
                 </button>
               </div>
             )}
           </div>
-          <button onClick={openPrint} disabled={!perms.print} title="Imprimir (⌘P)" aria-label="Imprimir">
+          <button onClick={openPrint} disabled={!perms.print} title={t("Imprimir (⌘P)")} aria-label={t("Imprimir")}>
             🖨
           </button>
-          <button onClick={() => save(true)} title="Guardar como (⇧⌘S)">
-            Guardar como…
+          <button onClick={() => save(true)} title={t("Guardar como (⇧⌘S)")}>
+            {t("Guardar como…")}
           </button>
-          <button className="primary" onClick={() => save(false)} disabled={!history.dirty && !isNew} title="Guardar (⌘S)">
-            Guardar
+          <button className="primary" onClick={() => save(false)} disabled={!history.dirty && !isNew} title={t("Guardar (⌘S)")}>
+            {t("Guardar")}
           </button>
         </div>
       </div>
@@ -1282,39 +1292,40 @@ export function DocumentView({
       {doc.security?.restricted && (
         <div className="sig-banner is-bad">
           <span>
-            🔒 Su autor no permite:{" "}
-            {(
-              [
-                ["print", "imprimir"],
-                ["copy", "copiar"],
-                ["edit", "modificar"],
-                ["annotate", "comentar"],
-                ["form", "rellenar formularios"],
-                ["assemble", "organizar páginas"],
-              ] as const
-            )
-              .filter(([k]) => !perms[k])
-              .map(([, label]) => label)
-              .join(", ")}
-            .
+            {t("🔒 Su autor no permite: {list}.", {
+              list: (
+                [
+                  ["print", t("imprimir")],
+                  ["copy", t("copiar")],
+                  ["edit", t("modificar")],
+                  ["annotate", t("comentar")],
+                  ["form", t("rellenar formularios")],
+                  ["assemble", t("organizar páginas")],
+                ] as const
+              )
+                .filter(([k]) => !perms[k])
+                .map(([, label]) => label)
+                .join(", "),
+            })}
           </span>
-          <button onClick={() => setUnlocking({ wrong: false })}>Desbloquear…</button>
+          <button onClick={() => setUnlocking({ wrong: false })}>{t("Desbloquear…")}</button>
         </div>
       )}
       {doc.scanned.length > 0 && mode === "read" && (
         <div className="place-hint">
           <span>
             {doc.scanned.length === info.pages.length
-              ? "Este documento parece escaneado"
-              : `${doc.scanned.length} ${doc.scanned.length === 1 ? "página parece escaneada" : "páginas parecen escaneadas"}`}
-            : su texto no se puede buscar ni copiar.
+              ? t("Este documento parece escaneado: su texto no se puede buscar ni copiar.")
+              : doc.scanned.length === 1
+                ? t("{n} página parece escaneada: su texto no se puede buscar ni copiar.", { n: doc.scanned.length })
+                : t("{n} páginas parecen escaneadas: su texto no se puede buscar ni copiar.", { n: doc.scanned.length })}
           </span>
-          <button onClick={() => setConvertDialog("ocr")}>Reconocer texto…</button>
+          <button onClick={() => setConvertDialog("ocr")}>{t("Reconocer texto…")}</button>
         </div>
       )}
       {mode === "edit" && signatures.length > 0 && (
         <div className="sig-banner is-bad">
-          <span>El documento está firmado: si editas el contenido, las firmas indicarán que se ha modificado después de firmar.</span>
+          <span>{t("El documento está firmado: si editas el contenido, las firmas indicarán que se ha modificado después de firmar.")}</span>
         </div>
       )}
       {sigStatus && mode === "read" && (
@@ -1322,15 +1333,15 @@ export function DocumentView({
           <span>
             {sigStatus.ok ? "✓" : "✗"} {sigStatus.text}
           </span>
-          <button onClick={() => setPanel("signatures")}>Ver firmas</button>
+          <button onClick={() => setPanel("signatures")}>{t("Ver firmas")}</button>
         </div>
       )}
       {(tool === "sign" || tool === "sigfield") && mode === "read" && (
         <div className="place-hint">
           {tool === "sign"
-            ? "Haz clic donde quieras colocar la firma."
-            : "Arrastra un rectángulo donde irá la firma digital (o haz clic para un tamaño estándar)."}
-          <button onClick={() => chooseTool("select")}>Cancelar (Esc)</button>
+            ? t("Haz clic donde quieras colocar la firma.")
+            : t("Arrastra un rectángulo donde irá la firma digital (o haz clic para un tamaño estándar).")}
+          <button onClick={() => chooseTool("select")}>{t("Cancelar (Esc)")}</button>
         </div>
       )}
       <div className="read-mode" hidden={mode === "organize"}>
@@ -1386,8 +1397,9 @@ export function DocumentView({
             locked={!perms.annotate}
             extra={
               <>
-                <button className={panel === "comments" ? "is-on" : ""} onClick={() => setPanel(panel === "comments" ? null : "comments")} title="Comentarios">
-                  Comentarios{annots.length ? ` (${annots.length})` : ""}
+                <button className={panel === "comments" ? "is-on" : ""} onClick={() => setPanel(panel === "comments" ? null : "comments")} title={t("Comentarios")}>
+                  {t("Comentarios")}
+                  {annots.length ? ` (${annots.length})` : ""}
                 </button>
                 <div className="menu-anchor">
                   <button
@@ -1397,18 +1409,19 @@ export function DocumentView({
                     aria-expanded={signMenu}
                     disabled={signing}
                   >
-                    {signing ? "Firmando…" : "✍ Firmar ▾"}
+                    {signing ? t("Firmando…") : t("✍ Firmar ▾")}
                   </button>
                   {signMenu && (
                     <div className="menu" role="menu" onClick={() => setSignMenu(false)}>
                       <button role="menuitem" onClick={() => setHandDialog({ target: null })}>
-                        Firma manuscrita…
+                        {t("Firma manuscrita…")}
                       </button>
                       <button role="menuitem" onClick={() => setCertDialog({ target: null })}>
-                        Firma digital con certificado…
+                        {t("Firma digital con certificado…")}
                       </button>
                       <button role="menuitem" onClick={() => setPanel("signatures")}>
-                        Ver firmas del documento{signatures.length ? ` (${signatures.length})` : ""}
+                        {t("Ver firmas del documento")}
+                        {signatures.length ? ` (${signatures.length})` : ""}
                       </button>
                     </div>
                   )}
@@ -1432,7 +1445,7 @@ export function DocumentView({
                   onDropOnTab={onCopyPagesTo}
                   onDropOutside={onSendPages}
                   onMove={async (pages, to) => {
-                    if (!perms.assemble) return onError("El autor de este documento no permite cambiar sus páginas.");
+                    if (!perms.assemble) return onError(t("El autor de este documento no permite cambiar sus páginas."));
                     if ((await doc.movePages(pages, to)) !== null) setPageSel(positionsAfterMove(info.pages.length, pages, to));
                   }}
                 />
@@ -1503,7 +1516,7 @@ export function DocumentView({
                               <div
                                 key={`d${ci}-${k}`}
                                 className={`diff diff-${c.kind} ${ci === compare.active ? "is-active" : ""}`}
-                                title={c.kind === "removed" ? `Eliminado: ${c.text}` : c.kind === "changed" ? `Antes: ${c.oldText}` : "Añadido"}
+                                title={c.kind === "removed" ? t("Eliminado: {text}", { text: c.text }) : c.kind === "changed" ? t("Antes: {text}", { text: c.oldText }) : t("Añadido")}
                                 style={{ left: r[0] * zoom, top: r[1] * zoom, width: (r[2] - r[0]) * zoom, height: (r[3] - r[1]) * zoom }}
                               />
                             )),
@@ -1690,7 +1703,7 @@ export function DocumentView({
           {mode === "protect" && (
             <aside className="sidebar sidebar-right">
               <CommentsPanel
-                noun={["marca de redacción", "marcas de redacción"]}
+                noun={[tk("marca de redacción"), tk("marcas de redacción")]}
                 annots={redactMarks}
                 selectedId={selectedId}
                 focusId={null}
@@ -1717,10 +1730,10 @@ export function DocumentView({
                   onExport: async (format) => {
                     try {
                       const bytes = await pdf.call("commentsSummary", [docId, name, format]);
-                      if (format === "pdf") onOpenBytes(bytes, `${baseName(name)} - comentarios.pdf`);
-                      else await onSaveCopy(bytes, `${baseName(name)} - comentarios.xlsx`);
+                      if (format === "pdf") onOpenBytes(bytes, t("{name} - comentarios.pdf", { name: baseName(name) }));
+                      else await onSaveCopy(bytes, t("{name} - comentarios.xlsx", { name: baseName(name) }));
                     } catch (e) {
-                      onError(`No se pudo hacer el resumen: ${e instanceof Error ? e.message : e}`);
+                      onError(t("No se pudo hacer el resumen: {error}", { error: errorText(e) }));
                     }
                   },
                 }}
@@ -1849,7 +1862,7 @@ export function DocumentView({
             try {
               return { bytes, pages: await pdf.call("pdfPageCount", [bytes]) };
             } catch (e) {
-              onError(`No se pudo leer ${fileName(path)}: ${e instanceof Error ? e.message : e}`);
+              onError(t("No se pudo leer {name}: {error}", { name: fileName(path), error: errorText(e) }));
               return null;
             }
           }}
@@ -1869,35 +1882,36 @@ export function DocumentView({
         (() => {
           // Con varias miniaturas seleccionadas, el menú actúa sobre todas
           const ps = pageSel.length > 1 && pageSel.includes(thumbMenu.page) ? [...pageSel].sort((a, b) => a - b) : [thumbMenu.page];
-          const what = ps.length === 1 ? `página ${ps[0] + 1}` : `${ps.length} páginas`;
+          const one = ps.length === 1;
+          const p = { page: ps[0] + 1, n: ps.length };
           return (
             <div className="modal-backdrop menu-backdrop" onMouseDown={() => setThumbMenu(null)}>
               <div className="menu context-menu" role="menu" style={{ left: thumbMenu.x, top: thumbMenu.y }} onMouseDown={(e) => e.stopPropagation()} onClick={() => setThumbMenu(null)}>
                 {ps.length === 1 && (
                   <button role="menuitem" disabled={!perms.assemble} onClick={() => addBookmark(ps[0])}>
-                    Añadir marcador a la página {ps[0] + 1}
+                    {t("Añadir marcador a la página {page}", p)}
                   </button>
                 )}
                 <button role="menuitem" disabled={!perms.assemble} onClick={() => duplicatePages(ps)}>
-                  Duplicar {what}
+                  {one ? t("Duplicar página {page}", p) : t("Duplicar {n} páginas", p)}
                 </button>
                 <button role="menuitem" disabled={!perms.assemble} onClick={() => openDocDialog("replace", ps)}>
-                  Sustituir {what}…
+                  {one ? t("Sustituir página {page}…", p) : t("Sustituir {n} páginas…", p)}
                 </button>
                 <button role="menuitem" disabled={!perms.assemble} onClick={() => openDocDialog("crop")}>
-                  Recortar páginas…
+                  {t("Recortar páginas…")}
                 </button>
                 <button role="menuitem" disabled={!perms.assemble} onClick={() => setPageDialog({ kind: "insert" })}>
-                  Insertar páginas…
+                  {t("Insertar páginas…")}
                 </button>
                 <button role="menuitem" disabled={!perms.assemble} onClick={() => setPageDialog({ kind: "extract", pages: ps })}>
-                  Extraer {what}…
+                  {one ? t("Extraer página {page}…", p) : t("Extraer {n} páginas…", p)}
                 </button>
                 <button role="menuitem" disabled={!perms.assemble} onClick={() => doc.rotate(ps, 90)}>
-                  Girar a la derecha
+                  {t("Girar a la derecha")}
                 </button>
                 <button role="menuitem" disabled={!perms.assemble} onClick={() => doc.rotate(ps, -90)}>
-                  Girar a la izquierda
+                  {t("Girar a la izquierda")}
                 </button>
                 <button
                   role="menuitem"
@@ -1907,7 +1921,7 @@ export function DocumentView({
                     if ((await doc.deletePages(ps)) !== null) setPageSel([]);
                   }}
                 >
-                  Eliminar {what}
+                  {one ? t("Eliminar página {page}", p) : t("Eliminar {n} páginas", p)}
                 </button>
               </div>
             </div>
@@ -1920,7 +1934,7 @@ export function DocumentView({
           layout={printLayout}
           onDone={(error) => {
             setPrintImages(null);
-            if (error) onError(`No se pudo imprimir: ${error}`);
+            if (error) onError(t("No se pudo imprimir: {error}", { error }));
           }}
         />
       )}
@@ -1958,7 +1972,7 @@ export function DocumentView({
         <CompressDialog
           onRun={doc.compress}
           onSave={async (bytes) => {
-            await onSaveCopy(bytes, `${baseName(name)} (reducido).pdf`);
+            await onSaveCopy(bytes, t("{name} (reducido).pdf", { name: baseName(name) }));
             setProtectDialog(null);
           }}
           onCancel={() => setProtectDialog(null)}
@@ -1968,7 +1982,7 @@ export function DocumentView({
         <div className="modal-backdrop">
           <form
             className="modal"
-            aria-label="Desbloquear documento"
+            aria-label={t("Desbloquear documento")}
             onSubmit={async (e) => {
               e.preventDefault();
               const pw = new FormData(e.currentTarget).get("owner") as string;
@@ -1976,16 +1990,16 @@ export function DocumentView({
               else setUnlocking({ wrong: true });
             }}
           >
-            <h2>Desbloquear documento</h2>
-            <p>Escribe la contraseña de permisos (de propietario) para quitar las restricciones mientras lo tienes abierto.</p>
-            <input name="owner" type="password" autoFocus aria-label="Contraseña de permisos" key={String(unlocking.wrong)} />
-            {unlocking.wrong && <p className="error-text">Contraseña incorrecta.</p>}
+            <h2>{t("Desbloquear documento")}</h2>
+            <p>{t("Escribe la contraseña de permisos (de propietario) para quitar las restricciones mientras lo tienes abierto.")}</p>
+            <input name="owner" type="password" autoFocus aria-label={t("Contraseña de permisos")} key={String(unlocking.wrong)} />
+            {unlocking.wrong && <p className="error-text">{t("Contraseña incorrecta.")}</p>}
             <div className="modal-actions">
               <button type="button" onClick={() => setUnlocking(null)}>
-                Cancelar
+                {t("Cancelar")}
               </button>
               <button type="submit" className="primary">
-                Desbloquear
+                {t("Desbloquear")}
               </button>
             </div>
           </form>
@@ -2020,9 +2034,9 @@ export function DocumentView({
       {certDialog && <CertificateDialog hasTarget={!!certDialog.target} onConfirm={onCertificate} onCancel={() => setCertDialog(null)} />}
       {signChooser && (
         <div className="modal-backdrop">
-          <div className="modal" role="dialog" aria-label="Cómo firmar">
-            <h2>Firmar «{signChooser.name}»</h2>
-            <p>La firma digital con certificado tiene validez legal y protege el documento frente a cambios. La manuscrita es solo una imagen.</p>
+          <div className="modal" role="dialog" aria-label={t("Cómo firmar")}>
+            <h2>{t("Firmar «{name}»", { name: signChooser.name })}</h2>
+            <p>{t("La firma digital con certificado tiene validez legal y protege el documento frente a cambios. La manuscrita es solo una imagen.")}</p>
             <div className="modal-actions modal-actions-stack">
               <button
                 className="primary"
@@ -2031,7 +2045,7 @@ export function DocumentView({
                   setSignChooser(null);
                 }}
               >
-                Firma digital con certificado…
+                {t("Firma digital con certificado…")}
               </button>
               <button
                 onClick={() => {
@@ -2039,9 +2053,9 @@ export function DocumentView({
                   setSignChooser(null);
                 }}
               >
-                Firma manuscrita…
+                {t("Firma manuscrita…")}
               </button>
-              <button onClick={() => setSignChooser(null)}>Cancelar</button>
+              <button onClick={() => setSignChooser(null)}>{t("Cancelar")}</button>
             </div>
           </div>
         </div>

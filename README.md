@@ -1,71 +1,72 @@
 # MegaPDF
 
-Editor de PDF de escritorio para Mac y Windows, en español y totalmente local: ningún documento sale
-del equipo, sin cuentas ni servidor.
+A desktop PDF editor for Mac and Windows that works completely offline: no account, no server,
+and no document ever leaves your computer. Available in **English**, **Spanish** and **Catalan**.
 
-**Descargar:** los instaladores de la última versión están en [Releases](../../releases/latest)
-(`.dmg` para Mac, `-setup.exe` o `.msi` para Windows). No están firmados: en Mac, la primera vez
-abre la app con clic derecho → Abrir; en Windows, en el aviso de SmartScreen pulsa «Más información»
-→ «Ejecutar de todas formas».
+[Español](README.es.md) · [Català](README.ca.md)
 
-Especificación en [docs/SPEC.md](docs/SPEC.md) y plan por fases en [docs/PLAN.md](docs/PLAN.md).
+## Download
 
-## Desarrollo
+Get the installers for the latest version from [Releases](../../releases/latest):
+
+| System | File |
+| --- | --- |
+| macOS (Apple Silicon and Intel) | `MegaPDF_x.y.z_universal.dmg` |
+| Windows 10/11 | `MegaPDF_x.y.z_x64-setup.exe` (or the `.msi`) |
+
+The installers are not code-signed:
+
+- **macOS:** the first time, right-click the app → **Open**, then confirm.
+- **Windows:** if SmartScreen appears, click **More info** → **Run anyway**.
+
+The first time you open MegaPDF it asks for your language (your system language is preselected).
+You can change it later in **Preferences**.
+
+## Features
+
+- **View and read:** fast rendering, thumbnails, bookmarks, search, continuous / single / two-page
+  layouts, presentation mode, night and sepia reading, read aloud, tabs and multiple windows.
+- **Comment and review:** highlight, underline, notes, text boxes, shapes, freehand drawing, stamps
+  (including your own), replies and review status, comments summary to PDF or Excel, measuring
+  distances and areas to scale, and "Fill & sign" marks for forms without fields.
+- **Edit content:** edit existing text by paragraph, keeping the document's own font (or the same font
+  installed on your computer), with alignment and justification; add text and images, links, headers
+  and footers, Bates numbering and watermarks, find and replace.
+- **Organize pages:** insert, extract, split, combine, rotate, crop, duplicate and replace pages;
+  drag pages between documents and windows.
+- **Forms:** fill in and create form fields, number/date formats, export and import data
+  (Excel, CSV, XFDF), one PDF per spreadsheet row.
+- **Sign:** handwritten signatures and digital signatures with .p12/.pfx certificates, with verification.
+- **Protect:** passwords and permissions, true redaction (with patterns for IDs, IBANs, e-mails…),
+  removing hidden information, reducing file size.
+- **OCR:** offline text recognition in 9 languages, also for crooked or rotated scans.
+- **Convert:** Word, Excel and text to PDF (with Microsoft Office when installed), and PDF to Word,
+  Excel, text and images.
+- **Batch processing:** apply OCR, watermarks, numbering, compression, passwords or conversions to many
+  files at once; search across all the PDFs in a folder; compare two versions side by side.
+
+## Development
+
+Built with [Tauri 2](https://tauri.app) (Rust), React and TypeScript; PDF engine:
+[MuPDF.js](https://mupdf.com) (WebAssembly) in a Web Worker; OCR: tesseract.js.
 
 ```sh
 pnpm install
-pnpm tauri dev      # app con recarga en caliente
-pnpm test           # tests del motor y del visor
-pnpm test:e2e       # pruebas de interfaz en WebKit (el motor de Tauri en macOS)
-pnpm tauri build    # instalador para la plataforma actual
-pnpm test:e2e --build   # pruebas de interfaz con la versión compilada
-node scripts/make-icon.mjs && pnpm tauri icon icons-src/megapdf-1024.png   # regenerar el icono
+pnpm tauri dev          # app with hot reload
+pnpm test               # engine and viewer tests
+pnpm test:e2e           # UI tests in WebKit (Tauri's engine on macOS)
+pnpm test:e2e --build   # UI tests against the production build
+pnpm tauri build        # installer for the current platform
+node scripts/i18n-check.mjs   # every UI string has an English and Catalan translation
 ```
 
-En macOS, el `.dmg` necesita que la terminal tenga permiso para controlar el Finder
-(Ajustes del Sistema → Privacidad y seguridad → Automatización). Sin él, `pnpm tauri build --bundles app`
-genera solo la aplicación. El flujo `.github/workflows/build.yml` compila los instaladores de macOS
-(universal) y Windows en GitHub Actions.
+The UI text is written in Spanish inside `t("…")` calls (`src/i18n/`); translations live in
+`src/i18n/en/*.json` and `src/i18n/ca/*.json`. The native menu is translated in `src-tauri/src/lib.rs`.
+The `.github/workflows/build.yml` workflow builds the macOS (universal) and Windows installers; it only
+runs when started manually.
 
-## Estructura
+Code comments and the design notes in [docs/](docs/) are in Spanish.
 
-- `src/pdf/engine.ts` — operaciones sobre PDF con MuPDF (sin DOM; testeable en Node).
-- `src/pdf/worker.ts`, `src/pdf/client.ts` — el motor corre en un Web Worker; `pdf.call()` es el proxy tipado.
-- `src/viewer/` — visor: scroll virtualizado, zoom, miniaturas, marcadores, búsqueda.
-- `src/pdf/annotations.ts` — crear/editar anotaciones (sellos con apariencia propia).
-- `src/annot/` — herramientas de anotación, capa de interacción por página y panel de comentarios.
-- `src/pdf/pages.ts` — lógica pura de páginas: reordenar, rangos, división, selección.
-- `src/pdf/outline.ts` — añadir, renombrar, mover y borrar marcadores.
-- `src/pdf/document.ts` — propiedades, adjuntos, recorte, enlaces, imágenes incrustadas y sustituir páginas (`src/document/`).
-- `src/pdf/review.ts`, `src/pdf/summary.ts` — respuestas y estados de comentarios (como Acrobat) y resumen en PDF y Excel.
-- `src/pdf/replace.ts` — buscar y reemplazar texto por líneas; `src/pdf/headings.ts` — marcadores desde los títulos.
-- `src/pdf/formData.ts` — datos de formulario por nombre de campo (Excel, CSV, XFDF; un PDF por fila).
-- `src/convert/xlsxWriter.ts`, `src/convert/sheetReader.ts` — escribir y leer hojas (Excel y CSV).
-- `src/annot/measure.ts`, `src/annot/customStamps.ts` — medidas a escala y sellos propios.
-- `src/viewer/layout.ts` — colocación de páginas (continua, página a página, dos páginas con o sin portada).
-- `src/batch/` — procesar varios archivos; `src/search/` — buscar en una carpeta; `src/compare/` — comparar lado a lado.
-- `src/pdf/graft.ts` — copiar páginas entre documentos con anotaciones, campos (renombrados si chocan), enlaces internos y marcadores.
-- `src/organize/` — vista Organizar páginas y diálogos de combinar, dividir, insertar y extraer páginas.
-- `src/pdf/forms.ts` — campos de formulario: leer, rellenar, crear, editar, aplanar; campo de firma.
-- `src/pdf/fieldFormat.ts` — formatos de número, importe, porcentaje y fecha, guardados como los scripts estándar de Acrobat.
-- `src/pdf/sign.ts` — firma digital PKCS#7 con certificados .p12/.pfx y su verificación.
-- `src/forms/` — rellenar formularios y modo Preparar formulario.
-- `src/sign/` — firma manuscrita (dibujar, escribir, imagen), firma con certificado y panel de firmas.
-- `src/pdf/content.ts` — edición de contenido: texto e imágenes propios, editar líneas, encabezado/pie, Bates y marca de agua.
-- `src/edit/` — modo Editar (también las líneas de un escaneado con OCR) y pegar imágenes o texto (`paste.ts`, `src/clipboard.ts`).
-- `src/pdf/security.ts` — contraseñas y permisos, redacción (con patrones de DNI, IBAN…), limpieza y reducción de tamaño.
-- `src/protect/` — modo Proteger.
-- `src/ocr/` — OCR con tesseract.js, sin conexión: 9 idiomas, varias páginas a la vez, giro de páginas de lado y
-  lectura enderezada del texto torcido (`words.ts`). Recursos copiados a `public/ocr` por `scripts/ocr-assets.mjs`.
-- `src/convert/` — Word/Excel/texto a PDF (conversor propio vía HTML) y exportación a Word, Excel, texto e imágenes.
-- `src-tauri/src/office.rs` — conversión con Microsoft Office cuando está instalado (AppleScript en macOS, COM en Windows).
-- `src-tauri/src/lib.rs` — listar los PDF de una carpeta (`list_pdfs`), lectura/escritura de archivos, menú nativo, impresión, PDF abiertos desde el sistema
-  y paso de documentos entre ventanas (`stash_document`/`take_stashed`; la ventana nueva lo recibe con `?doc=`).
-- `src/print/`, `src/compare/` — imprimir y comparar versiones (`src/pdf/compare.ts`, diff de Myers).
-- `src/prefs.ts`, `src/Preferences.tsx` — preferencias y documentos recientes.
-- `tests/e2e/` — pruebas de interfaz con la parte nativa de Tauri simulada.
-- `src-tauri/` — lectura/escritura de archivos en binario y diálogos nativos.
+## License
 
-## Licencia
-
-AGPL-3.0 (ver [LICENSE](LICENSE)), la misma que MuPDF, el motor PDF que usa la app.
+[AGPL-3.0](LICENSE), the same license as MuPDF, the PDF engine used by the app.

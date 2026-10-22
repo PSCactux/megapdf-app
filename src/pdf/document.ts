@@ -1,6 +1,7 @@
 import * as mupdf from "mupdf";
 import { type Rect, pageOrigin } from "./annotations";
 import { normalizeUrl } from "./url";
+import { t } from "../i18n";
 
 export { normalizeUrl };
 
@@ -193,7 +194,7 @@ function findSpec(doc: mupdf.PDFDocument, key: string): mupdf.PDFObject {
     const annot = findAttachmentAnnot(doc, Number(key.slice(6)));
     if (annot) return annot.getFileSpec();
   }
-  throw new Error("Ese adjunto ya no está en el documento");
+  throw new Error(t("Ese adjunto ya no está en el documento"));
 }
 
 function findAttachmentAnnot(doc: mupdf.PDFDocument, id: number): mupdf.PDFAnnotation | null {
@@ -206,7 +207,7 @@ function findAttachmentAnnot(doc: mupdf.PDFDocument, id: number): mupdf.PDFAnnot
 
 export function attachmentContents(doc: mupdf.PDFDocument, key: string): Uint8Array {
   const contents = doc.getEmbeddedFileContents(findSpec(doc, key));
-  if (!contents) throw new Error("El adjunto está vacío o dañado");
+  if (!contents) throw new Error(t("El adjunto está vacío o dañado"));
   return contents.asUint8Array().slice();
 }
 
@@ -253,7 +254,7 @@ export function removeAttachment(doc: mupdf.PDFDocument, key: string) {
     return;
   }
   const annot = findAttachmentAnnot(doc, Number(key.slice(6)));
-  if (!annot) throw new Error("Ese adjunto ya no está en el documento");
+  if (!annot) throw new Error(t("Ese adjunto ya no está en el documento"));
   for (let i = 0; i < doc.countPages(); i++) {
     const page = doc.loadPage(i);
     if (page.getAnnotations().some((a) => a.getObject().asIndirect() === annot.getObject().asIndirect())) page.deleteAnnotation(annot);
@@ -287,12 +288,12 @@ export type Margins = { left: number; top: number; right: number; bottom: number
 const MIN_SIDE = 36;
 
 export function cropPages(doc: mupdf.PDFDocument, pages: number[], m: Margins) {
-  if ([m.left, m.top, m.right, m.bottom].some((v) => !Number.isFinite(v) || v < 0)) throw new Error("Los márgenes no pueden ser negativos");
+  if ([m.left, m.top, m.right, m.bottom].some((v) => !Number.isFinite(v) || v < 0)) throw new Error(t("Los márgenes no pueden ser negativos"));
   for (const i of pages) {
     const page = doc.loadPage(i);
     const [x0, y0, x1, y1] = page.getBounds();
     const rect: Rect = [x0 + m.left, y0 + m.top, x1 - m.right, y1 - m.bottom];
-    if (rect[2] - rect[0] < MIN_SIDE || rect[3] - rect[1] < MIN_SIDE) throw new Error(`Con esos márgenes no queda nada de la página ${i + 1}`);
+    if (rect[2] - rect[0] < MIN_SIDE || rect[3] - rect[1] < MIN_SIDE) throw new Error(t("Con esos márgenes no queda nada de la página {n}", { n: i + 1 }));
     page.setPageBox("CropBox", rect);
   }
 }
@@ -351,10 +352,10 @@ export function readLinks(doc: mupdf.PDFDocument, pageIndex: number): PageLink[]
   });
 }
 
-function targetUri(doc: mupdf.PDFDocument, t: LinkTarget): string {
-  if ("url" in t) return normalizeUrl(t.url);
-  if (!Number.isInteger(t.page) || t.page < 0 || t.page >= doc.countPages()) throw new Error("Esa página no existe en el documento");
-  return `#page=${t.page + 1}`;
+function targetUri(doc: mupdf.PDFDocument, target: LinkTarget): string {
+  if ("url" in target) return normalizeUrl(target.url);
+  if (!Number.isInteger(target.page) || target.page < 0 || target.page >= doc.countPages()) throw new Error(t("Esa página no existe en el documento"));
+  return `#page=${target.page + 1}`;
 }
 
 export function addLink(doc: mupdf.PDFDocument, pageIndex: number, rect: Rect, target: LinkTarget) {
@@ -366,7 +367,7 @@ export function addLink(doc: mupdf.PDFDocument, pageIndex: number, rect: Rect, t
 export function updateLink(doc: mupdf.PDFDocument, pageIndex: number, index: number, patch: { rect?: Rect; target?: LinkTarget }) {
   const page = doc.loadPage(pageIndex);
   const link = page.getLinks()[index];
-  if (!link) throw new Error("Ese enlace ya no existe");
+  if (!link) throw new Error(t("Ese enlace ya no existe"));
   const [ox, oy] = pageOrigin(page);
   // A diferencia de createLink, setBounds trabaja en coordenadas del PDF (y hacia arriba)
   if (patch.rect) {
@@ -381,7 +382,7 @@ export function updateLink(doc: mupdf.PDFDocument, pageIndex: number, index: num
 export function removeLink(doc: mupdf.PDFDocument, pageIndex: number, index: number) {
   const page = doc.loadPage(pageIndex);
   const link = page.getLinks()[index];
-  if (!link) throw new Error("Ese enlace ya no existe");
+  if (!link) throw new Error(t("Ese enlace ya no existe"));
   page.deleteLink(link);
 }
 
@@ -440,7 +441,7 @@ const PAGE_LOOK = ["Contents", "Resources", "MediaBox", "CropBox", "BleedBox", "
  * Como en Acrobat, se conservan los comentarios, enlaces y marcadores de las páginas sustituidas.
  */
 export function replacePages(doc: mupdf.PDFDocument, targets: number[], src: mupdf.PDFDocument, from: number[]) {
-  if (targets.length !== from.length) throw new Error(`Hay ${targets.length} páginas que sustituir y ${from.length} páginas nuevas: tienen que ser las mismas`);
+  if (targets.length !== from.length) throw new Error(t("Hay {sustituir} páginas que sustituir y {nuevas} páginas nuevas: tienen que ser las mismas", { sustituir: targets.length, nuevas: from.length }));
   const map = doc.newGraftMap();
   targets.forEach((t, k) => {
     const temp = doc.countPages();

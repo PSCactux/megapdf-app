@@ -2,6 +2,7 @@ mod fonts;
 mod office;
 
 use percent_encoding::percent_decode_str;
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Mutex;
 use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
@@ -14,7 +15,7 @@ use tauri::RunEvent;
 fn read_file(path: String) -> Result<Response, String> {
     std::fs::read(&path)
         .map(Response::new)
-        .map_err(|e| format!("No se pudo leer {path}: {e}"))
+        .map_err(|e| tr(&format!("No se pudo leer {path}: {e}"), &format!("Could not read {path}: {e}"), &format!("No s'ha pogut llegir {path}: {e}")))
 }
 
 /// El cuerpo es el contenido en binario; la ruta va en la cabecera `path`, codificada como URI.
@@ -32,7 +33,7 @@ fn write_file(request: Request) -> Result<(), String> {
     let path = percent_decode_str(encoded)
         .decode_utf8()
         .map_err(|e| e.to_string())?;
-    std::fs::write(path.as_ref(), bytes).map_err(|e| format!("No se pudo guardar {path}: {e}"))
+    std::fs::write(path.as_ref(), bytes).map_err(|e| tr(&format!("No se pudo guardar {path}: {e}"), &format!("Could not save {path}: {e}"), &format!("No s'ha pogut desar {path}: {e}")))
 }
 
 /// PDF de una carpeta (y sus subcarpetas, si se pide), para buscar en todos ellos.
@@ -50,7 +51,7 @@ const MAX_PDFS: usize = 5000;
 #[tauri::command]
 fn list_pdfs(folder: String, recursive: bool) -> Result<PdfList, String> {
     let mut list = PdfList { files: vec![], skipped: vec![], truncated: false };
-    let root = std::fs::read_dir(&folder).map_err(|e| format!("No se pudo leer la carpeta {folder}: {e}"))?;
+    let root = std::fs::read_dir(&folder).map_err(|e| tr(&format!("No se pudo leer la carpeta {folder}: {e}"), &format!("Could not read the folder {folder}: {e}"), &format!("No s'ha pogut llegir la carpeta {folder}: {e}")))?;
     walk_pdfs(root, recursive, 0, &mut list);
     list.files.sort();
     Ok(list)
@@ -129,7 +130,7 @@ fn stash_document(request: Request, stash: tauri::State<Stash>) -> Result<String
 
 #[tauri::command]
 fn take_stashed(token: String, stash: tauri::State<Stash>) -> Result<Response, String> {
-    stash.0.lock().unwrap().remove(&token).map(Response::new).ok_or_else(|| "El documento ya no está disponible".into())
+    stash.0.lock().unwrap().remove(&token).map(Response::new).ok_or_else(|| tr("El documento ya no está disponible", "The document is no longer available", "El document ja no està disponible"))
 }
 
 /// Otra ventana de MegaPDF bajo un punto de la pantalla (en píxeles lógicos, como `screenX` en la
@@ -174,7 +175,7 @@ fn take_pending_files(state: tauri::State<PendingFiles>) -> Vec<String> {
 /// Abre el diálogo de impresión del sistema con la ventana (la interfaz deja visibles solo las páginas).
 #[tauri::command]
 fn print_window(window: tauri::WebviewWindow) -> Result<(), String> {
-    window.print().map_err(|e| format!("No se pudo imprimir: {e}"))
+    window.print().map_err(|e| tr(&format!("No se pudo imprimir: {e}"), &format!("Could not print: {e}"), &format!("No s'ha pogut imprimir: {e}")))
 }
 
 fn pdf_args<I: IntoIterator<Item = String>>(args: I) -> Vec<String> {
@@ -190,15 +191,16 @@ fn queue_files(app: &tauri::AppHandle, files: Vec<String>) {
     let _ = app.emit_to(focused_window(app), "open-files", ());
 }
 
-fn build_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let item = |id: &str, label: &str, accel: Option<&str>| {
-        let b = MenuItemBuilder::with_id(id, label);
+fn build_menu(app: &tauri::AppHandle, lang: &str) -> tauri::Result<Menu<tauri::Wry>> {
+    let t = |es: &'static str| menu_text(lang, es);
+    let item = |id: &str, label: &'static str, accel: Option<&str>| {
+        let b = MenuItemBuilder::with_id(id, t(label));
         match accel {
             Some(a) => b.accelerator(a).build(app),
             None => b.build(app),
         }
     };
-    let file = SubmenuBuilder::new(app, "Archivo")
+    let file = SubmenuBuilder::new(app, t("Archivo"))
         .item(&item("new-window", "Nueva ventana", Some("CmdOrCtrl+N"))?)
         .item(&item("open", "Abrir…", Some("CmdOrCtrl+O"))?)
         .item(&item("create", "Crear PDF…", None)?)
@@ -213,19 +215,19 @@ fn build_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         .separator()
         .item(&item("properties", "Propiedades del documento…", Some("CmdOrCtrl+D"))?);
     #[cfg(not(target_os = "macos"))]
-    let file = file.separator().item(&item("preferences", "Preferencias…", None)?).separator().quit();
-    let edit = SubmenuBuilder::new(app, "Edición")
+    let file = file.separator().item(&item("preferences", "Preferencias…", None)?).separator().quit_with_text(t("Salir"));
+    let edit = SubmenuBuilder::new(app, t("Edición"))
         .item(&item("undo", "Deshacer", Some("CmdOrCtrl+Z"))?)
         .item(&item("redo", "Rehacer", Some("CmdOrCtrl+Shift+Z"))?)
         .separator()
-        .cut()
-        .copy()
-        .paste()
-        .select_all()
+        .cut_with_text(t("Cortar"))
+        .copy_with_text(t("Copiar"))
+        .paste_with_text(t("Pegar"))
+        .select_all_with_text(t("Seleccionar todo"))
         .separator()
         .item(&item("find", "Buscar", Some("CmdOrCtrl+F"))?)
         .item(&item("folder-search", "Buscar en una carpeta…", Some("CmdOrCtrl+Shift+F"))?);
-    let pages = SubmenuBuilder::new(app, "Páginas")
+    let pages = SubmenuBuilder::new(app, t("Páginas"))
         .item(&item("insert-pages", "Insertar páginas…", None)?)
         .item(&item("extract-pages", "Extraer páginas…", None)?)
         .item(&item("replace-pages", "Sustituir páginas…", None)?)
@@ -233,7 +235,7 @@ fn build_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         .item(&item("crop-pages", "Recortar páginas…", None)?)
         .separator()
         .item(&item("add-bookmark", "Añadir marcador", Some("CmdOrCtrl+B"))?);
-    let view = SubmenuBuilder::new(app, "Ver")
+    let view = SubmenuBuilder::new(app, t("Ver"))
         .item(&item("zoom-in", "Acercar", Some("CmdOrCtrl+="))?)
         .item(&item("zoom-out", "Alejar", Some("CmdOrCtrl+-"))?)
         .item(&item("zoom-reset", "Tamaño real", Some("CmdOrCtrl+0"))?)
@@ -248,25 +250,122 @@ fn build_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         .item(&item("read-aloud", "Leer en voz alta", Some("CmdOrCtrl+Shift+Y"))?)
         .item(&item("snapshot", "Copiar una zona como imagen", None)?)
         .item(&item("presentation", "Presentación", Some("CmdOrCtrl+L"))?);
-    let window = SubmenuBuilder::new(app, "Ventana").minimize().fullscreen();
+    let window = SubmenuBuilder::new(app, t("Ventana")).minimize_with_text(t("Minimizar")).fullscreen_with_text(t("Pantalla completa"));
     let menu = MenuBuilder::new(app);
     #[cfg(target_os = "macos")]
     let menu = menu.item(
         &SubmenuBuilder::new(app, "MegaPDF")
-            .about(None)
+            .about_with_text(t("Acerca de MegaPDF"), None)
             .separator()
             .item(&item("preferences", "Preferencias…", Some("CmdOrCtrl+,"))?)
             .separator()
-            .services()
+            .services_with_text(t("Servicios"))
             .separator()
-            .hide()
-            .hide_others()
-            .show_all()
+            .hide_with_text(t("Ocultar MegaPDF"))
+            .hide_others_with_text(t("Ocultar otros"))
+            .show_all_with_text(t("Mostrar todo"))
             .separator()
-            .quit()
+            .quit_with_text(t("Salir"))
             .build()?,
     );
     menu.items(&[&file.build()?, &edit.build()?, &pages.build()?, &view.build()?, &window.build()?]).build()
+}
+
+/// Textos del menú en el idioma de la interfaz (los mismos que traduce la parte web).
+fn menu_text(lang: &str, es: &'static str) -> &'static str {
+    let (en, ca) = match es {
+        "Archivo" => ("File", "Fitxer"),
+        "Nueva ventana" => ("New Window", "Finestra nova"),
+        "Abrir…" => ("Open…", "Obre…"),
+        "Crear PDF…" => ("Create PDF…", "Crea un PDF…"),
+        "Combinar archivos…" => ("Combine Files…", "Combina fitxers…"),
+        "Procesar varios archivos…" => ("Process Multiple Files…", "Processa diversos fitxers…"),
+        "Cerrar pestaña" => ("Close Tab", "Tanca la pestanya"),
+        "Guardar" => ("Save", "Desa"),
+        "Guardar como…" => ("Save As…", "Desa com a…"),
+        "Imprimir…" => ("Print…", "Imprimeix…"),
+        "Propiedades del documento…" => ("Document Properties…", "Propietats del document…"),
+        "Preferencias…" => ("Preferences…", "Preferències…"),
+        "Edición" => ("Edit", "Edició"),
+        "Deshacer" => ("Undo", "Desfés"),
+        "Rehacer" => ("Redo", "Refés"),
+        "Cortar" => ("Cut", "Retalla"),
+        "Copiar" => ("Copy", "Copia"),
+        "Pegar" => ("Paste", "Enganxa"),
+        "Seleccionar todo" => ("Select All", "Selecciona-ho tot"),
+        "Buscar" => ("Find", "Cerca"),
+        "Buscar en una carpeta…" => ("Search in a Folder…", "Cerca en una carpeta…"),
+        "Páginas" => ("Pages", "Pàgines"),
+        "Insertar páginas…" => ("Insert Pages…", "Insereix pàgines…"),
+        "Extraer páginas…" => ("Extract Pages…", "Extreu pàgines…"),
+        "Sustituir páginas…" => ("Replace Pages…", "Substitueix pàgines…"),
+        "Duplicar página" => ("Duplicate Page", "Duplica la pàgina"),
+        "Recortar páginas…" => ("Crop Pages…", "Retalla pàgines…"),
+        "Añadir marcador" => ("Add Bookmark", "Afegeix un marcador"),
+        "Ver" => ("View", "Visualitza"),
+        "Acercar" => ("Zoom In", "Apropa"),
+        "Alejar" => ("Zoom Out", "Allunya"),
+        "Tamaño real" => ("Actual Size", "Mida real"),
+        "Ajustar al ancho" => ("Fit Width", "Ajusta a l'amplada"),
+        "Continua" => ("Continuous", "Contínua"),
+        "Página a página" => ("Single Page", "Pàgina a pàgina"),
+        "Dos páginas" => ("Two Pages", "Dues pàgines"),
+        "Dos páginas con portada" => ("Two Pages with Cover", "Dues pàgines amb portada"),
+        "Lectura nocturna" => ("Night Reading", "Lectura nocturna"),
+        "Leer en voz alta" => ("Read Aloud", "Llegeix en veu alta"),
+        "Copiar una zona como imagen" => ("Copy an Area as Image", "Copia una zona com a imatge"),
+        "Presentación" => ("Presentation", "Presentació"),
+        "Ventana" => ("Window", "Finestra"),
+        "Minimizar" => ("Minimize", "Minimitza"),
+        "Pantalla completa" => ("Full Screen", "Pantalla completa"),
+        "Acerca de MegaPDF" => ("About MegaPDF", "Quant a MegaPDF"),
+        "Servicios" => ("Services", "Serveis"),
+        "Ocultar MegaPDF" => ("Hide MegaPDF", "Amaga MegaPDF"),
+        "Ocultar otros" => ("Hide Others", "Amaga els altres"),
+        "Mostrar todo" => ("Show All", "Mostra-ho tot"),
+        "Salir" => ("Quit", "Surt"),
+        _ => (es, es),
+    };
+    match lang {
+        "en" => en,
+        "ca" => ca,
+        _ => es,
+    }
+}
+
+/// Idioma del sistema («es-ES», «ca-ES», «en-US»…), para proponerlo la primera vez.
+#[tauri::command]
+fn system_locale() -> Option<String> {
+    sys_locale::get_locale()
+}
+
+/// Idioma de la interfaz para los mensajes de error: 0 español, 1 inglés, 2 catalán.
+static LANGUAGE: AtomicU8 = AtomicU8::new(0);
+
+/// El mensaje en el idioma de la interfaz.
+pub(crate) fn tr(es: &str, en: &str, ca: &str) -> String {
+    match LANGUAGE.load(Ordering::Relaxed) {
+        1 => en,
+        2 => ca,
+        _ => es,
+    }
+    .to_string()
+}
+
+/// La interfaz cambia de idioma: se rehace el menú.
+#[tauri::command]
+fn set_language(app: tauri::AppHandle, lang: String) -> Result<(), String> {
+    let code = match lang.as_str() {
+        "en" => 1,
+        "ca" => 2,
+        _ => 0,
+    };
+    if LANGUAGE.swap(code, Ordering::Relaxed) == code {
+        return Ok(());
+    }
+    let menu = build_menu(&app, &lang).map_err(|e| e.to_string())?;
+    app.set_menu(menu).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -286,13 +385,13 @@ pub fn run() {
         .manage(Stash::default())
         .manage(fonts::FontIndex::default())
         .setup(|app| {
-            app.set_menu(build_menu(app.handle())?)?;
+            app.set_menu(build_menu(app.handle(), "es")?)?;
             app.on_menu_event(|app, event| {
                 let _ = app.emit_to(focused_window(app), "menu", event.id().0.clone());
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![read_file, write_file, user_name, office_apps, office_to_pdf, take_pending_files, print_window, stash_document, take_stashed, list_pdfs, window_at, fonts::system_font])
+        .invoke_handler(tauri::generate_handler![read_file, write_file, user_name, office_apps, office_to_pdf, take_pending_files, print_window, stash_document, take_stashed, list_pdfs, window_at, fonts::system_font, system_locale, set_language])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
     app.run(|_handle, _event| {

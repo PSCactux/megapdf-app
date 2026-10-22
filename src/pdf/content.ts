@@ -1,6 +1,7 @@
 import * as mupdf from "mupdf";
 import { type Point, type Rect, type RGB, pageOrigin, pdfString, textWidth } from "./annotations";
 import { type DocFont, type Glyph, WIN_ANSI, documentFont } from "./fonts";
+import { locale, t } from "../i18n";
 
 /**
  * Edición del contenido de las páginas.
@@ -204,7 +205,7 @@ export function readOverlays(page: mupdf.PDFPage, index: number): Overlay[] {
 // --- Texto e imágenes propios -----------------------------------------------
 
 export function addText(doc: mupdf.PDFDocument, page: mupdf.PDFPage, data: TextData, font = chooseFont(doc, page, data)): number {
-  if (!data.text.trim()) throw new Error("El texto está vacío");
+  if (!data.text.trim()) throw new Error(t("El texto está vacío"));
   const { content, rect } = typeset(doc, page, data, font);
   return appendOwn(doc, page, "text", { ...data, rect }, content).asIndirect();
 }
@@ -365,7 +366,7 @@ export function updateOverlay(doc: mupdf.PDFDocument, page: mupdf.PDFPage, id: n
     writeOwn(doc, stream, page, imageContent(data.image, rect), { rect, image: data.image });
     return id;
   } else {
-    throw new Error("Ese elemento no se puede editar");
+    throw new Error(t("Ese elemento no se puede editar"));
   }
 }
 
@@ -553,7 +554,7 @@ export function addHeaderFooter(doc: mupdf.PDFDocument, pages: mupdf.PDFPage[], 
       t
         .replace(/\{n\}/g, String(i + 1))
         .replace(/\{total\}/g, String(pages.length))
-        .replace(/\{fecha\}/g, date.toLocaleDateString("es-ES"))
+        .replace(/\{fecha\}/g, date.toLocaleDateString(locale()))
         .replace(/\{archivo\}/g, hf.fileName);
     const parts: string[] = [];
     const placed: Placed[] = [];
@@ -589,7 +590,7 @@ export function addBates(doc: mupdf.PDFDocument, pages: mupdf.PDFPage[], bates: 
 }
 
 export function addWatermark(doc: mupdf.PDFDocument, pages: mupdf.PDFPage[], wm: Watermark) {
-  if (!wm.text.trim()) throw new Error("La marca de agua está vacía");
+  if (!wm.text.trim()) throw new Error(t("La marca de agua está vacía"));
   const font = new mupdf.Font("Helvetica-Bold");
   const width = textWidth(font, wm.text, wm.size);
   for (const page of pages) {
@@ -759,7 +760,7 @@ function findOwn(page: mupdf.PDFPage, id: number): mupdf.PDFObject {
   forEachContent(page.getObject(), (s) => {
     if (s.asIndirect() === id) found = s;
   });
-  if (!found) throw new Error("Ese elemento ya no existe en la página");
+  if (!found) throw new Error(t("Ese elemento ya no existe en la página"));
   return found;
 }
 

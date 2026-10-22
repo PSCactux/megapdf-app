@@ -20,7 +20,7 @@ export const check = (label, cond) => {
  * Abre la app con los archivos dados disponibles en /docs/<nombre>.
  * La simulación guarda lo escrito en window.__writes y lo hace legible después.
  */
-export async function launch(fileNames, { width = 1400, height = 1100, author = "José Pérez García", label = "main", query = "", stash = {} } = {}) {
+export async function launch(fileNames, { width = 1400, height = 1100, author = "José Pérez García", label = "main", query = "", stash = {}, language = "es", systemLocale = "es-ES" } = {}) {
   fs.mkdirSync(OUT, { recursive: true });
   const files = Object.fromEntries(fileNames.map((f) => [`/docs/${f}`, fs.readFileSync(path.join(FIXTURES, f)).toString("base64")]));
   const browser = await webkit.launch();
@@ -29,7 +29,15 @@ export async function launch(fileNames, { width = 1400, height = 1100, author = 
   page.on("console", (m) => m.type() !== "debug" && logs.push(`${m.type()}: ${m.text()}`));
   page.on("pageerror", (e) => logs.push(`pageerror: ${e.message}`));
   await page.addInitScript(
-    ({ files, author, label, stash }) => {
+    ({ files, author, label, stash, language, systemLocale }) => {
+      // Idioma ya elegido (null: primera vez que se abre la app, pregunta)
+      if (language && !sessionStorage.getItem("__langSet")) {
+        const prefs = JSON.parse(localStorage.getItem("megapdf.prefs") ?? "{}");
+        localStorage.setItem("megapdf.prefs", JSON.stringify({ ...prefs, language }));
+        sessionStorage.setItem("__langSet", "1");
+      }
+      window.__systemLocale = systemLocale;
+      window.__languages = [];
       window.__windows = [];
       window.__stash = stash;
       window.__next_open = [];
@@ -85,6 +93,11 @@ export async function launch(fileNames, { width = 1400, height = 1100, author = 
           // Ventana de MegaPDF bajo un punto de la pantalla (la prueba decide cuál)
           if (cmd === "window_at") return window.__windowAt ?? null;
           // Fuentes del equipo: ninguna, salvo que la prueba diga otra cosa
+          if (cmd === "system_locale") return window.__systemLocale;
+          if (cmd === "set_language") {
+            window.__languages.push(args.lang);
+            return;
+          }
           if (cmd === "system_font") {
             (window.__fontRequests ??= []).push(args);
             return window.__systemFont ?? null;
@@ -154,7 +167,7 @@ export async function launch(fileNames, { width = 1400, height = 1100, author = 
         },
       };
     },
-    { files, author, label, stash },
+    { files, author, label, stash, language, systemLocale },
   );
   await page.goto(URL + query);
 

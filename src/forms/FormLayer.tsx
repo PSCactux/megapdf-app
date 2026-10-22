@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Field } from "../pdf/forms";
 import { parseInput } from "../pdf/fieldFormat";
+import { t } from "../i18n";
 
 type Props = {
   fields: Field[];
@@ -23,7 +24,7 @@ export function FormLayer({ fields, zoom, interactive, highlight, onChange, onIn
         const [x0, y0, x1, y1] = f.rect;
         const style = { left: x0 * zoom, top: y0 * zoom, width: (x1 - x0) * zoom, height: (y1 - y0) * zoom };
         const fontSize = (f.fontSize || Math.min((y1 - y0) * 0.65, 12)) * zoom;
-        const label = `${f.name}${f.required ? " (obligatorio)" : ""}`;
+        const label = f.required ? t("{name} (obligatorio)", { name: f.name }) : f.name;
         switch (f.kind) {
           case "text":
             return <TextField key={f.id} field={f} style={{ ...style, fontSize }} label={label} onCommit={(v) => onChange(f, v)} onInvalid={(m) => onInvalid(`${f.name}: ${m}`)} />;
@@ -66,10 +67,10 @@ export function FormLayer({ fields, zoom, interactive, highlight, onChange, onIn
             );
           case "signature":
             return f.signed ? (
-              <button key={f.id} className="field field-signed" style={style} title="Ver detalles de la firma" aria-label={`Firma: ${f.name}`} onClick={() => onShowSignature(f)} />
+              <button key={f.id} className="field field-signed" style={style} title={t("Ver detalles de la firma")} aria-label={t("Firma: {name}", { name: f.name })} onClick={() => onShowSignature(f)} />
             ) : (
-              <button key={f.id} className="field field-sign" style={style} aria-label={`Firmar: ${f.name}`} disabled={f.readOnly} onClick={() => onSignField(f)}>
-                ✍ Firmar aquí
+              <button key={f.id} className="field field-sign" style={style} aria-label={t("Firmar: {name}", { name: f.name })} disabled={f.readOnly} onClick={() => onSignField(f)}>
+                ✍ {t("Firmar aquí")}
               </button>
             );
           default:

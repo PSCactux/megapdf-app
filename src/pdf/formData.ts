@@ -3,6 +3,7 @@ import { type Field, readFields, setFieldValue } from "./forms";
 import { parseInput } from "./fieldFormat";
 import type { Cell } from "../convert/xlsxWriter";
 import { type XNode, attr, child, decodeXml, elements, escapeHtml as esc, parseXml, textOf } from "../convert/xml";
+import { t } from "../i18n";
 
 /**
  * Datos de un formulario como una fila de hoja de cálculo: una columna por campo (por su
@@ -21,7 +22,7 @@ export function fieldNames(doc: mupdf.PDFDocument): string[] {
 export function fieldValues(doc: mupdf.PDFDocument): Map<string, Cell> {
   const values = new Map<string, Cell>();
   for (const f of readFields(doc).filter(fillable)) {
-    if (f.kind === "checkbox") values.set(f.name, f.checked ? "Sí" : "No");
+    if (f.kind === "checkbox") values.set(f.name, f.checked ? t("Sí") : t("No"));
     else if (f.kind === "radio") {
       if (f.checked || !values.has(f.name)) values.set(f.name, f.checked ? (f.onValue ?? "") : "");
     } else if (f.format && f.format.kind !== "date" && f.value !== "" && Number.isFinite(Number(f.value))) values.set(f.name, Number(f.value));
@@ -59,13 +60,13 @@ export function fillFields(doc: mupdf.PDFDocument, values: Record<string, string
     const page = doc.loadPage(f.page);
     const problem = (why: string) => report.problems.push({ field: f.name, value: raw, why });
     if (f.readOnly) {
-      if (raw) problem("es de solo lectura");
+      if (raw) problem(t("es de solo lectura"));
       continue;
     }
     if (f.kind === "checkbox") {
       const v = raw.toLowerCase();
       if (!YES.has(v) && !NO.has(v) && v !== (f.onValue ?? "").toLowerCase()) {
-        problem("una casilla solo admite Sí o No");
+        problem(t("una casilla solo admite Sí o No"));
         continue;
       }
       setFieldValue(page, f.id, YES.has(v) || v === (f.onValue ?? "").toLowerCase());
@@ -77,14 +78,14 @@ export function fillFields(doc: mupdf.PDFDocument, values: Record<string, string
       const options = fields.filter((o) => o.name === f.name && o.kind === "radio");
       const chosen = options.find((o) => (o.onValue ?? "").toLowerCase() === raw.toLowerCase()) ?? options[Number(raw) - 1];
       if (!chosen) {
-        problem(`no es ninguna opción (${options.map((o) => o.onValue).join(", ")})`);
+        problem(t("no es ninguna opción ({opciones})", { opciones: options.map((o) => o.onValue).join(", ") }));
         continue;
       }
       setFieldValue(doc.loadPage(chosen.page), chosen.id, true);
     } else if (f.kind === "combo" || f.kind === "list") {
       const option = f.options.find((o) => o.toLowerCase() === raw.toLowerCase());
       if (!option) {
-        problem("no está en la lista de opciones");
+        problem(t("no está en la lista de opciones"));
         continue;
       }
       setFieldValue(page, f.id, option);
@@ -114,9 +115,9 @@ export function fromXfdf(xml: string): Record<string, string> {
   try {
     root = parseXml(xml);
   } catch {
-    throw new Error("El archivo XFDF no es válido");
+    throw new Error(t("El archivo XFDF no es válido"));
   }
-  if (root.tagName !== "xfdf") throw new Error("El archivo no es un XFDF de datos de formulario");
+  if (root.tagName !== "xfdf") throw new Error(t("El archivo no es un XFDF de datos de formulario"));
   const out: Record<string, string> = {};
   const walk = (node: XNode | undefined, prefix: string) => {
     for (const f of elements(node, "field")) {

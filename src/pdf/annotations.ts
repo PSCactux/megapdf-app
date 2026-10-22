@@ -1,5 +1,6 @@
 import * as mupdf from "mupdf";
 import type { Reply, Status } from "./review";
+import { locale, t, tk } from "../i18n";
 
 export type Point = [number, number];
 export type Rect = [number, number, number, number];
@@ -70,7 +71,7 @@ const STAMP_DETAIL_KEY = "MegaPDFStampDetail";
 const HAND_SIGNATURE_KEY = "MegaPDFHandSignature";
 const IMAGE_STAMP_KEY = "MegaPDFImageStamp";
 const MEASURE_KEY = "MegaPDFMeasure";
-const MEASURE_NAMES = { distance: "Distancia", perimeter: "Perímetro", area: "Área" } as const;
+const MEASURE_NAMES = { distance: tk("Distancia"), perimeter: tk("Perímetro"), area: tk("Área") } as const;
 
 type Origin = Point;
 
@@ -105,11 +106,11 @@ export function readAnnot(annot: mupdf.PDFAnnotation, pageIndex: number, origin:
     stampLabel: !stamp.isNull()
       ? stamp.asString()
       : !obj.get(HAND_SIGNATURE_KEY).isNull()
-        ? "Firma manuscrita"
+        ? t("Firma manuscrita")
         : obj.get(IMAGE_STAMP_KEY).isString()
           ? obj.get(IMAGE_STAMP_KEY).asString()
           : obj.get(MEASURE_KEY).isString()
-            ? MEASURE_NAMES[(JSON.parse(obj.get(MEASURE_KEY).asString()) as MeasureData).kind]
+            ? t(MEASURE_NAMES[(JSON.parse(obj.get(MEASURE_KEY).asString()) as MeasureData).kind])
             : null,
     replies: [],
     status: null,
@@ -119,7 +120,7 @@ export function readAnnot(annot: mupdf.PDFAnnotation, pageIndex: number, origin:
 export function createAnnot(doc: mupdf.PDFDocument, page: mupdf.PDFPage, spec: NewAnnot, author: string): mupdf.PDFAnnotation {
   const o = pageOrigin(page);
   if (spec.type === "Stamp") {
-    const detail = `${author} · ${new Date().toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}`;
+    const detail = `${author} · ${new Date().toLocaleString(locale(), { dateStyle: "short", timeStyle: "short" })}`;
     return createStamp(doc, page, { label: spec.label, detail, color: spec.color, author, at: shift(spec.at, o, 1) });
   }
   if (spec.type === "Signature") {
@@ -137,7 +138,7 @@ export function createAnnot(doc: mupdf.PDFDocument, page: mupdf.PDFPage, spec: N
     case "Redact":
       if (spec.quads?.length) annot.setQuadPoints(spec.quads.map((q) => shiftQuad(q, o, 1)));
       else if (spec.rect) annot.setRect(shiftRect(spec.rect, o, 1));
-      else throw new Error("La marca de redacción necesita un área o un texto");
+      else throw new Error(t("La marca de redacción necesita un área o un texto"));
       break;
     case "Highlight":
     case "Underline":
@@ -186,7 +187,7 @@ export function createAnnot(doc: mupdf.PDFDocument, page: mupdf.PDFPage, spec: N
 export function patchAnnot(doc: mupdf.PDFDocument, page: mupdf.PDFPage, annot: mupdf.PDFAnnotation, patch: AnnotPatch): mupdf.PDFAnnotation {
   const o = pageOrigin(page);
   const type = annot.getType();
-  if (patch.rect && !RESIZABLE.has(type)) throw new Error(`Las anotaciones de tipo ${type} no se pueden redimensionar`);
+  if (patch.rect && !RESIZABLE.has(type)) throw new Error(t("Las anotaciones de tipo {tipo} no se pueden redimensionar", { tipo: type }));
   if (type === "Stamp" && !annot.getObject().get(STAMP_KEY).isNull()) return patchStamp(doc, page, annot, patch, o);
   if (annot.getObject().get(MEASURE_KEY).isString()) return patchMeasure(doc, page, annot, patch);
   if (type === "Stamp" && (!annot.getObject().get(HAND_SIGNATURE_KEY).isNull() || annot.getObject().get(IMAGE_STAMP_KEY).isString())) return patchHandSignature(page, annot, patch, o);
@@ -239,7 +240,7 @@ function createHandSignature(page: mupdf.PDFPage, d: HandSignatureData): mupdf.P
   if (d.stamp) annot.getObject().put(IMAGE_STAMP_KEY, page._doc.newString(d.stamp));
   else annot.getObject().put(HAND_SIGNATURE_KEY, true);
   annot.setAuthor(d.author);
-  annot.setContents(d.stamp ? `Sello «${d.stamp}» de ${d.author}` : `Firma manuscrita de ${d.author}`);
+  annot.setContents(d.stamp ? t("Sello «{sello}» de {autor}", { sello: d.stamp, autor: d.author }) : t("Firma manuscrita de {autor}", { autor: d.author }));
   annot.setOpacity(d.opacity);
   annot.setModificationDate(new Date());
   annot.setRect(d.rect);

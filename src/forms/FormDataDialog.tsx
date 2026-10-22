@@ -5,6 +5,7 @@ import type { FillReport } from "../pdf/formData";
 import { type Cell, buildXlsx } from "../convert/xlsxWriter";
 import { readTable } from "../convert/sheetReader";
 import { baseName, fileName, joinPath, pickFolder, pickPdfs, readFile, writeFile } from "../files";
+import { t } from "../i18n";
 
 type Props = {
   docId: string;
@@ -40,22 +41,22 @@ export function FormDataDialog({ docId, name, onFill, onFillXfdf, onSaveCopy, on
   };
 
   const describe = (r: FillReport, label = ""): string[] => [
-    `${label}${r.filled} ${r.filled === 1 ? "campo rellenado" : "campos rellenados"}.`,
-    ...(r.unknown.length ? [`Columnas que no son campos del formulario: ${r.unknown.join(", ")}.`] : []),
-    ...r.problems.map((p) => `${label}«${p.field}» = «${p.value}»: ${p.why}.`),
+    label + (r.filled === 1 ? t("{n} campo rellenado.", { n: r.filled }) : t("{n} campos rellenados.", { n: r.filled })),
+    ...(r.unknown.length ? [t("Columnas que no son campos del formulario: {columns}.", { columns: r.unknown.join(", ") })] : []),
+    ...r.problems.map((p) => label + t("«{field}» = «{value}»: {why}.", { field: p.field, value: p.value, why: p.why })),
   ];
 
   const exportXlsx = () =>
     run(async () => {
       const { names, values } = await pdf.call("formData", [docId]);
-      if (!names.length) throw new Error("El documento no tiene campos de formulario");
-      await onSaveCopy(buildXlsx([{ name: "Datos", rows: [names, values], widths: names.map((n) => Math.max(12, n.length + 2)) }]), `${base} - datos.xlsx`);
+      if (!names.length) throw new Error(t("El documento no tiene campos de formulario"));
+      await onSaveCopy(buildXlsx([{ name: t("Datos"), rows: [names, values], widths: names.map((n) => Math.max(12, n.length + 2)) }]), t("{name} - datos.xlsx", { name: base }));
     });
 
   const exportXfdf = () =>
     run(async () => {
       const xml = await pdf.call("exportXfdf", [docId, name]);
-      await onSaveCopy(new TextEncoder().encode(xml), `${base} - datos.xfdf`);
+      await onSaveCopy(new TextEncoder().encode(xml), t("{name} - datos.xfdf", { name: base }));
     });
 
   /** Varios formularios iguales (rellenados por distintas personas) en una hoja: una fila por archivo. */
@@ -66,23 +67,24 @@ export function FormDataDialog({ docId, name, onFill, onFillXfdf, onSaveCopy, on
       const header: string[] = [];
       const rows: Map<string, Cell>[] = [];
       const skipped: string[] = [];
+      const fileCol = t("Archivo");
       for (const path of paths) {
         try {
           const { names, values } = await pdf.call("formDataOf", [await readFile(path)]);
           for (const n of names) if (!header.includes(n)) header.push(n);
-          rows.push(new Map([["Archivo", fileName(path)], ...names.map((n, i) => [n, values[i]] as [string, Cell])]));
+          rows.push(new Map([[fileCol, fileName(path)], ...names.map((n, i) => [n, values[i]] as [string, Cell])]));
         } catch (e) {
           skipped.push(`${fileName(path)}: ${e instanceof Error ? e.message : e}`);
         }
       }
-      const cols = ["Archivo", ...header];
-      await onSaveCopy(buildXlsx([{ name: "Formularios", rows: [cols, ...rows.map((r) => cols.map((c) => r.get(c) ?? ""))], widths: cols.map((c) => Math.max(12, c.length + 2)) }]), "Formularios.xlsx");
-      setReport([`${rows.length} ${rows.length === 1 ? "formulario juntado" : "formularios juntados"} en una hoja.`, ...skipped.map((s) => `No se pudo leer ${s}`)]);
+      const cols = [fileCol, ...header];
+      await onSaveCopy(buildXlsx([{ name: t("Formularios"), rows: [cols, ...rows.map((r) => cols.map((c) => r.get(c) ?? ""))], widths: cols.map((c) => Math.max(12, c.length + 2)) }]), t("Formularios.xlsx"));
+      setReport([rows.length === 1 ? t("{n} formulario juntado en una hoja.", { n: rows.length }) : t("{n} formularios juntados en una hoja.", { n: rows.length }), ...skipped.map((s) => t("No se pudo leer {file}", { file: s }))]);
     });
 
   const load = () =>
     run(async () => {
-      const path = await open({ multiple: false, filters: [{ name: "Datos de formulario", extensions: ["xlsx", "csv", "txt", "xfdf"] }] });
+      const path = await open({ multiple: false, filters: [{ name: t("Datos de formulario"), extensions: ["xlsx", "csv", "txt", "xfdf"] }] });
       if (!path) return;
       const bytes = await readFile(path);
       setReport(null);
@@ -93,7 +95,7 @@ export function FormDataDialog({ docId, name, onFill, onFillXfdf, onSaveCopy, on
       }
       const [header, ...rows] = readTable(bytes, path);
       const data = rows.filter((r) => r.some(Boolean));
-      if (!header || !data.length) throw new Error("La hoja no tiene datos: la primera fila son los nombres de los campos y debajo, una fila por formulario");
+      if (!header || !data.length) throw new Error(t("La hoja no tiene datos: la primera fila son los nombres de los campos y debajo, una fila por formulario"));
       setTable({ file: fileName(path), header, rows: data });
       setRow(0);
       setNameColumn(0);
@@ -123,38 +125,38 @@ export function FormDataDialog({ docId, name, onFill, onFillXfdf, onSaveCopy, on
         await writeFile(joinPath(folder, file), res.bytes);
         if (res.report.problems.length) lines.push(...describe(res.report, `${file}: `).slice(1));
       }
-      setReport([`${results.length} PDF creados en ${folder}.`, ...lines]);
+      setReport([t("{n} PDF creados en {folder}.", { n: results.length, folder }), ...lines]);
     });
 
   return (
     <div className="modal-backdrop">
-      <div className="modal modal-wide" role="dialog" aria-label="Datos del formulario">
-        <h2>Datos del formulario</h2>
+      <div className="modal modal-wide" role="dialog" aria-label={t("Datos del formulario")}>
+        <h2>{t("Datos del formulario")}</h2>
         <div className="props-row">
           <button onClick={exportXlsx} disabled={busy}>
-            Exportar a Excel…
+            {t("Exportar a Excel…")}
           </button>
           <button onClick={exportXfdf} disabled={busy}>
-            Exportar a XFDF (Acrobat)…
+            {t("Exportar a XFDF (Acrobat)…")}
           </button>
-          <button onClick={combine} disabled={busy} title="Varios PDF con este mismo formulario, rellenados por distintas personas">
-            Juntar varios formularios en una hoja…
+          <button onClick={combine} disabled={busy} title={t("Varios PDF con este mismo formulario, rellenados por distintas personas")}>
+            {t("Juntar varios formularios en una hoja…")}
           </button>
         </div>
         <div className="props-row">
           <button onClick={load} disabled={busy}>
-            Importar desde Excel, CSV o XFDF…
+            {t("Importar desde Excel, CSV o XFDF…")}
           </button>
-          <span className="muted">En la hoja, la primera fila son los nombres de los campos.</span>
+          <span className="muted">{t("En la hoja, la primera fila son los nombres de los campos.")}</span>
         </div>
         {table && (
           <fieldset className="prop-group">
             <legend>
-              {table.file}: {table.rows.length} {table.rows.length === 1 ? "fila" : "filas"}
+              {table.file}: {table.rows.length === 1 ? t("{n} fila", { n: table.rows.length }) : t("{n} filas", { n: table.rows.length })}
             </legend>
             <div className="props-row">
               <label className="prop" style={{ flex: 1 }}>
-                Fila
+                {t("Fila")}
                 <select id="form-row" value={row} onChange={(e) => setRow(Number(e.target.value))}>
                   {table.rows.map((r, i) => (
                     <option key={i} value={i}>
@@ -164,23 +166,23 @@ export function FormDataDialog({ docId, name, onFill, onFillXfdf, onSaveCopy, on
                 </select>
               </label>
               <button className="primary" onClick={fillHere} disabled={busy}>
-                Rellenar este documento
+                {t("Rellenar este documento")}
               </button>
             </div>
             {table.rows.length > 1 && (
               <div className="props-row">
                 <label className="prop" style={{ flex: 1 }}>
-                  Nombre de cada PDF, según la columna
+                  {t("Nombre de cada PDF, según la columna")}
                   <select id="form-name-column" value={nameColumn} onChange={(e) => setNameColumn(Number(e.target.value))}>
                     {table.header.map((h, i) => (
                       <option key={i} value={i}>
-                        {h || `Columna ${i + 1}`}
+                        {h || t("Columna {n}", { n: i + 1 })}
                       </option>
                     ))}
                   </select>
                 </label>
                 <button onClick={fillMany} disabled={busy}>
-                  Crear un PDF por fila…
+                  {t("Crear un PDF por fila…")}
                 </button>
               </div>
             )}
@@ -196,7 +198,7 @@ export function FormDataDialog({ docId, name, onFill, onFillXfdf, onSaveCopy, on
           </ul>
         )}
         <div className="modal-actions">
-          <button onClick={onClose}>Cerrar</button>
+          <button onClick={onClose}>{t("Cerrar")}</button>
         </div>
       </div>
     </div>
