@@ -1,0 +1,37 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Pruebas de interfaz: datos generados y capturas
+tests/e2e/.fixtures
+tests/e2e/.out
+
+# Recursos del OCR copiados desde node_modules (scripts/ocr-assets.mjs)
+public/ocr
+
+# Instaladores descargados de GitHub Actions
+instaladores
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
