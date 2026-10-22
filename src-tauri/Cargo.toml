@@ -1,6 +1,6 @@
 [package]
 name = "megapdf"
-version = "0.2.0"
+version = "0.2.1"
 description = "Editor de PDF"
 authors = ["MegaPDF"]
 edition = "2024"

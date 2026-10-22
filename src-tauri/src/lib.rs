@@ -1,8 +1,10 @@
 mod fonts;
+mod save;
 mod office;
 
 use percent_encoding::percent_decode_str;
 use std::sync::atomic::{AtomicU8, Ordering};
+use std::path::Path;
 use std::sync::Mutex;
 use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
@@ -19,8 +21,9 @@ fn read_file(path: String) -> Result<Response, String> {
 }
 
 /// El cuerpo es el contenido en binario; la ruta va en la cabecera `path`, codificada como URI.
+/// Se guarda fuera del hilo de la ventana: si el archivo está ocupado se reintenta unos segundos.
 #[tauri::command]
-fn write_file(request: Request) -> Result<(), String> {
+async fn write_file(request: Request<'_>) -> Result<(), String> {
     let InvokeBody::Raw(bytes) = request.body() else {
         return Err("write_file espera un cuerpo binario".into());
     };
@@ -33,7 +36,23 @@ fn write_file(request: Request) -> Result<(), String> {
     let path = percent_decode_str(encoded)
         .decode_utf8()
         .map_err(|e| e.to_string())?;
-    std::fs::write(path.as_ref(), bytes).map_err(|e| tr(&format!("No se pudo guardar {path}: {e}"), &format!("Could not save {path}: {e}"), &format!("No s'ha pogut desar {path}: {e}")))
+    let (path, bytes) = (path.into_owned(), bytes.to_vec());
+    tauri::async_runtime::spawn_blocking(move || {
+        save::save(Path::new(&path), &bytes).map_err(|e| {
+            if save::is_locked(&e) {
+                let name = Path::new(&path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.clone());
+                tr(
+                    &format!("«{name}» lo tiene abierto otro programa o alguien en otro equipo de la red (un visor de PDF, la vista previa del Explorador, el antivirus…). Ciérralo y vuelve a guardar, o usa «Guardar como…»."),
+                    &format!("“{name}” is open in another program or by someone on another computer on the network (a PDF viewer, the File Explorer preview, the antivirus…). Close it and save again, or use “Save as…”."),
+                    &format!("«{name}» el té obert un altre programa o algú en un altre ordinador de la xarxa (un visor de PDF, la previsualització de l'Explorador, l'antivirus…). Tanca'l i torna a desar, o fes servir «Desa com a…»."),
+                )
+            } else {
+                tr(&format!("No se pudo guardar {path}: {e}"), &format!("Could not save {path}: {e}"), &format!("No s'ha pogut desar {path}: {e}"))
+            }
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// PDF de una carpeta (y sus subcarpetas, si se pide), para buscar en todos ellos.
