@@ -8,7 +8,7 @@ import { WebviewWindow, getCurrentWebviewWindow } from "@tauri-apps/api/webviewW
 import { message as dialog } from "@tauri-apps/plugin-dialog";
 import type { DocInfo } from "./pdf/engine";
 import { pdf } from "./pdf/client";
-import { baseName, dirName, fileName, joinPath, pickConvertible, pickPdfs, pickSavePath, readFile, writeFile } from "./files";
+import { baseName, dirName, FileLockedError, fileName, joinPath, pickConvertible, pickPdfs, pickSavePath, readFile, writeFile } from "./files";
 import { DocumentView, type Jump } from "./viewer/DocumentView";
 import { FolderSearchDialog } from "./search/FolderSearchDialog";
 import { BatchDialog } from "./batch/BatchDialog";
@@ -264,9 +264,19 @@ export default function App() {
       remember(path);
       return true;
     } catch (e) {
+      if (e instanceof FileLockedError) return saveLocked(tab, asNew, e.message);
       showError(t("No se pudo guardar: {error}", { error: message(e) }));
       return false;
     }
+  }
+
+  /** El archivo lo tiene abierto otro programa: se explica quién y se ofrece reintentar o guardar con otro nombre. */
+  async function saveLocked(tab: Tab, asNew: boolean, text: string): Promise<boolean> {
+    const [retry, other] = [t("Reintentar"), t("Guardar como…")];
+    const answer = await dialog(text, { title: t("No se puede guardar"), kind: "warning", buttons: { yes: retry, no: other, cancel: t("Cancelar") } });
+    if (answer === retry) return save(tab, asNew);
+    if (answer === other) return save(tab, true);
+    return false;
   }
 
   /** Guarda el PDF firmado en un archivo nuevo y lo abre en lugar del documento original. */

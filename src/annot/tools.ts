@@ -126,5 +126,5 @@ export const TYPE_LABELS: Record<string, string> = {
   PolyLine: tk("Polilínea"),
   Caret: tk("Inserción"),
   FileAttachment: tk("Adjunto"),
-  Redact: tk("Redacción"),
+  Redact: tk("Censura"),
 };

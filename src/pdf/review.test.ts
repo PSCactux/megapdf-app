@@ -87,7 +87,7 @@ describe("Revisión de comentarios", () => {
     pdf.open("p", e.commentsSummary("a", "contrato.pdf", "pdf"));
     const text = pdf.selectText("p", 0, [0, 0], [2000, 2000]).text;
     for (const t of ["Comentarios", "contrato.pdf · 2 comentarios", "Página 1", "Nota", "Revisar el importe", "Completado", "Corregido en la versión 2", "APROBADO"]) expect(text, t).toContain(t);
-    expect(text).not.toContain("Redacción");
+    expect(text).not.toContain("Censura");
 
     const xlsx = unzipSync(e.commentsSummary("a", "contrato.pdf", "xlsx"));
     const sheet = strFromU8(xlsx["xl/worksheets/sheet1.xml"]);

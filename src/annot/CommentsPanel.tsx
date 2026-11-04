@@ -98,7 +98,7 @@ export function CommentsPanel({
         <p className="sidebar-empty">
           {!redaction
             ? t("No hay comentarios. Usa las herramientas de la barra para añadir resaltados, notas, formas o sellos.")
-            : t("No hay nada marcado para redactar. Marca áreas o texto, o usa «Buscar y redactar».")}
+            : t("No hay nada marcado para censurar. Marca zonas o texto, o usa «Buscar y censurar».")}
         </p>
       </>
     );
@@ -370,9 +370,9 @@ function Properties({ annot, autoFocus, onPatch, onRemove }: { annot: Annot; aut
 
 /** «3 comentarios», «1 marca de redacción», «2 de 5 comentarios» (con filtros). */
 function count(redaction: boolean, shown: number | null, total: number): string {
-  if (shown !== null) return redaction ? t("{shown} de {total} marcas de redacción", { shown, total }) : t("{shown} de {total} comentarios", { shown, total });
-  if (total === 1) return redaction ? t("1 marca de redacción") : t("1 comentario");
-  return redaction ? t("{n} marcas de redacción", { n: total }) : t("{n} comentarios", { n: total });
+  if (shown !== null) return redaction ? t("{shown} de {total} marcas de censura", { shown, total }) : t("{shown} de {total} comentarios", { shown, total });
+  if (total === 1) return redaction ? t("1 marca de censura") : t("1 comentario");
+  return redaction ? t("{n} marcas de censura", { n: total }) : t("{n} comentarios", { n: total });
 }
 
 const closest = (values: number[], v: number) => values.reduce((a, b) => (Math.abs(b - v) < Math.abs(a - v) ? b : a));

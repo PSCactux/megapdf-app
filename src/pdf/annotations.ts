@@ -138,7 +138,7 @@ export function createAnnot(doc: mupdf.PDFDocument, page: mupdf.PDFPage, spec: N
     case "Redact":
       if (spec.quads?.length) annot.setQuadPoints(spec.quads.map((q) => shiftQuad(q, o, 1)));
       else if (spec.rect) annot.setRect(shiftRect(spec.rect, o, 1));
-      else throw new Error(t("La marca de redacción necesita un área o un texto"));
+      else throw new Error(t("La marca de censura necesita una zona o un texto"));
       break;
     case "Highlight":
     case "Underline":

@@ -34,14 +34,14 @@ import { BatesDialog, HeaderFooterDialog, WatermarkDialog } from "../edit/Decora
 import type { TextStyle } from "../pdf/content";
 import { ALL_PERMISSIONS, type CleanReport } from "../pdf/security";
 import { ProtectToolbar } from "../protect/ProtectToolbar";
-import { CleanDialog, CompressDialog, FindRedactDialog, PasswordDialog } from "../protect/ProtectDialogs";
+import { CleanDialog, CompressDialog, FindRedactDialog, PagesRedactDialog, PasswordDialog } from "../protect/ProtectDialogs";
 import { OcrDialog } from "../ocr/OcrDialog";
 import { ExportImagesDialog } from "../ocr/ExportImagesDialog";
 import { PRINT_DPI, PrintDialog, PrintView } from "../print/Print";
 import type { PrintLayout } from "../print/sheets";
 import { ComparePanel } from "../compare/ComparePanel";
 import { OldVersionPane, oldPageFor } from "../compare/OldVersionPane";
-import { open } from "@tauri-apps/plugin-dialog";
+import { message, open } from "@tauri-apps/plugin-dialog";
 import type { Change } from "../pdf/compare";
 import type { Command } from "../App";
 import { type ExtractSpec, type InsertSpec, ExtractPagesDialog, InsertPagesDialog, describePages } from "../organize/PageDialogs";
@@ -199,7 +199,7 @@ export function DocumentView({
   /** Marcador cuyo nombre se está escribiendo (su ruta unida con puntos). */
   const [renamingBookmark, setRenamingBookmark] = useState<string | null>(null);
   const [decoDialog, setDecoDialog] = useState<"header-footer" | "bates" | "watermark" | null>(null);
-  const [protectDialog, setProtectDialog] = useState<"password" | "find" | "clean" | "compress" | null>(null);
+  const [protectDialog, setProtectDialog] = useState<"password" | "find" | "pages" | "clean" | "compress" | null>(null);
   const [cleanReport, setCleanReport] = useState<CleanReport | null>(null);
   const [unlocking, setUnlocking] = useState<{ wrong: boolean } | null>(null);
   // Permisos del documento (restricciones del autor). Sin información aún, todo permitido.
@@ -371,7 +371,7 @@ export function DocumentView({
       (n === 1
         ? t("Se borrará para siempre lo marcado ({n} marca): texto, imágenes y dibujos cubiertos. Puedes deshacerlo hasta que guardes.", { n })
         : t("Se borrará para siempre lo marcado ({n} marcas): texto, imágenes y dibujos cubiertos. Puedes deshacerlo hasta que guardes.", { n })) + warning,
-      t("Aplicar redacciones"),
+      t("Aplicar la censura"),
     );
     if (ok) await doc.applyRedactions();
   }
@@ -497,6 +497,18 @@ export function DocumentView({
   }
 
   async function save(asNew: boolean) {
+    // Lo marcado para censurar sigue en el archivo hasta aplicarlo: no se guarda así sin preguntar
+    if (redactMarks.length) {
+      const [apply, keep] = [t("Censurar y guardar"), t("Guardar sin censurar")];
+      const answer = await message(
+        redactMarks.length === 1
+          ? t("Hay 1 zona marcada para censurar que aún no se ha aplicado: lo que hay debajo seguiría en el archivo y se podría leer o copiar.")
+          : t("Hay {n} zonas marcadas para censurar que aún no se han aplicado: lo que hay debajo seguiría en el archivo y se podría leer o copiar.", { n: redactMarks.length }),
+        { title: t("Censura sin aplicar"), kind: "warning", buttons: { yes: apply, no: keep, cancel: t("Cancelar") } },
+      );
+      if (answer !== apply && answer !== keep) return;
+      if (answer === apply && (await doc.applyRedactions()) === null) return;
+    }
     if (await onSave(asNew)) await doc.markSaved();
   }
 
@@ -1049,7 +1061,7 @@ export function DocumentView({
           <button
             role="tab"
             aria-selected={mode === "protect"}
-            title={t("Redactar, contraseñas, información oculta y tamaño")}
+            title={t("Censurar, contraseñas, información oculta y tamaño")}
             className={mode === "protect" ? "is-on" : ""}
             disabled={!!doc.security?.restricted}
             onClick={() => {
@@ -1057,7 +1069,7 @@ export function DocumentView({
               chooseTool("select");
             }}
           >
-            {t("Proteger")}
+            {t("Censurar y proteger")}
           </button>
         </div>
         {mode !== "read" ? (
@@ -1352,6 +1364,7 @@ export function DocumentView({
             pendingProtection={!!doc.security?.pending}
             onTool={chooseTool}
             onFind={() => setProtectDialog("find")}
+            onPages={() => setProtectDialog("pages")}
             onApply={applyRedactions}
             onPassword={() => setProtectDialog("password")}
             onClean={() => {
@@ -1954,6 +1967,14 @@ export function DocumentView({
             setConvertDialog("ocr");
           }}
           onSearch={doc.findSensitive}
+          onMark={async (hits) => (await doc.markRedactions(hits)) !== null && setProtectDialog(null)}
+          onCancel={() => setProtectDialog(null)}
+        />
+      )}
+      {protectDialog === "pages" && (
+        <PagesRedactDialog
+          pages={info.pages}
+          current={current}
           onMark={async (hits) => (await doc.markRedactions(hits)) !== null && setProtectDialog(null)}
           onCancel={() => setProtectDialog(null)}
         />

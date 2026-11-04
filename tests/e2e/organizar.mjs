@@ -33,6 +33,17 @@ check("página 6 movida al principio", /Mover páginas/.test(await undoTitle()) 
 
 await view().getByRole("button", { name: "↻ Girar" }).click();
 await wait();
+// Recuadro sobre el fondo: desde la esquina de la cuadrícula hasta la tercera miniatura
+const grid = await view().locator(".page-grid").boundingBox();
+const third = await view().locator('.grid-item[data-index="2"]').boundingBox();
+await page.mouse.move(grid.x + 6, grid.y + 6);
+await page.mouse.down();
+await page.mouse.move(third.x + third.width / 2, third.y + third.height / 2, { steps: 8 });
+await page.mouse.up();
+check("selección con recuadro", (await status()) === "3 páginas seleccionadas");
+await view().getByRole("button", { name: "Seleccionar todas" }).click();
+check("seleccionar todas", (await status()) === `${await items()} páginas seleccionadas`);
+
 await view().locator('.grid-item[data-index="1"]').click();
 await view().locator('.grid-item[data-index="2"]').click({ modifiers: ["Shift"] });
 check("selección con ⇧", (await status()) === "2 páginas seleccionadas");

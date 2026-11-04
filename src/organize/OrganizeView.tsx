@@ -31,6 +31,8 @@ type Props = {
 type Press = { index: number; x: number; y: number; pages: number[]; collapseOnClick: boolean };
 /** `tab`: el puntero está sobre la pestaña de otro documento (soltar copia las páginas allí). */
 type Drag = { pages: number[]; x: number; y: number; drop: number | null; tab: string | null };
+/** Recuadro de selección sobre el fondo, en coordenadas del contenido de la cuadrícula (sigue al desplazarse). `base`: lo que ya estaba seleccionado con ⇧/Ctrl. */
+type Lasso = { x0: number; y0: number; x: number; y: number; base: number[] };
 
 const DRAG_THRESHOLD = 5;
 const dragLabel = (pages: number[]) => (pages.length === 1 ? t("Página {n}", { n: pages[0] + 1 }) : t("{n} páginas", { n: pages.length }));
@@ -40,6 +42,7 @@ export function OrganizeView({ docId, info, doc, baseName, selection, anchor, on
   const gridRef = useRef<HTMLDivElement>(null);
   const press = useRef<Press | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [lasso, setLasso] = useState<Lasso | null>(null);
   const [thumbWidth, setThumbWidth] = useState(160);
   const [splitting, setSplitting] = useState(false);
   const { readPdf, dialog: passwordDialog } = usePdfPassword();
@@ -104,6 +107,44 @@ export function OrganizeView({ docId, info, doc, baseName, selection, anchor, on
     else if (y > r.bottom - 40) grid.scrollBy(0, 20);
   }
 
+  function contentPoint(e: React.PointerEvent) {
+    const grid = gridRef.current!;
+    const r = grid.getBoundingClientRect();
+    return { x: e.clientX - r.left + grid.scrollLeft, y: e.clientY - r.top + grid.scrollTop };
+  }
+
+  function onLassoDown(e: React.PointerEvent) {
+    if (e.target !== e.currentTarget || e.button !== 0) return;
+    const add = e.shiftKey || e.metaKey || e.ctrlKey;
+    const p = contentPoint(e);
+    setLasso({ x0: p.x, y0: p.y, x: p.x, y: p.y, base: add ? selection : [] });
+    if (!add) onSelection([], null);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  /** Selecciona las páginas que toca el recuadro (más las que ya había con ⇧/Ctrl). */
+  function onLassoMove(e: React.PointerEvent) {
+    if (!lasso) return;
+    const grid = gridRef.current!;
+    const p = contentPoint(e);
+    const next = { ...lasso, x: p.x, y: p.y };
+    setLasso(next);
+    autoScroll(e.clientY);
+    const g = grid.getBoundingClientRect();
+    const [left, right] = [Math.min(next.x0, next.x), Math.max(next.x0, next.x)];
+    const [top, bottom] = [Math.min(next.y0, next.y), Math.max(next.y0, next.y)];
+    const hits = [...grid.querySelectorAll<HTMLElement>("[data-index]")]
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        const x = r.left - g.left + grid.scrollLeft;
+        const y = r.top - g.top + grid.scrollTop;
+        return x < right && x + r.width > left && y < bottom && y + r.height > top;
+      })
+      .map((el) => Number(el.dataset.index));
+    const pages = [...new Set([...next.base, ...hits])].sort((a, b) => a - b);
+    onSelection(pages, hits[0] ?? anchor);
+  }
+
   async function remove(pages: number[]) {
     if ((await doc.deletePages(pages)) !== null) onSelection([], null);
   }
@@ -156,6 +197,10 @@ export function OrganizeView({ docId, info, doc, baseName, selection, anchor, on
         <button onClick={() => setSplitting(true)}>{t("Dividir…")}</button>
         <div className="spacer" />
         <span className="muted">{label}</span>
+        {selection.length < 2 && <span className="muted organize-hint">{t("Varias: arrastra un recuadro sobre el fondo o usa ⇧+clic")}</span>}
+        <button disabled={selection.length === count} onClick={() => onSelection(info.pages.map((_, i) => i), 0)} title={t("Seleccionar todas las páginas (Ctrl/⌘+A)")}>
+          {t("Seleccionar todas")}
+        </button>
         <label className="group muted" title={t("Tamaño de las miniaturas")}>
           ▫
           <input type="range" min={100} max={300} value={thumbWidth} onChange={(e) => setThumbWidth(Number(e.target.value))} />
@@ -166,10 +211,17 @@ export function OrganizeView({ docId, info, doc, baseName, selection, anchor, on
       <div
         className={`page-grid ${drag ? "is-dragging" : ""}`}
         ref={gridRef}
-        onPointerDown={(e) => {
-          if (e.target === e.currentTarget) onSelection([], null);
-        }}
+        onPointerDown={onLassoDown}
+        onPointerMove={onLassoMove}
+        onPointerUp={() => setLasso(null)}
+        onPointerCancel={() => setLasso(null)}
       >
+        {lasso && (
+          <div
+            className="lasso"
+            style={{ left: Math.min(lasso.x0, lasso.x), top: Math.min(lasso.y0, lasso.y), width: Math.abs(lasso.x - lasso.x0), height: Math.abs(lasso.y - lasso.y0) }}
+          />
+        )}
         {info.pages.map((size, i) => (
           <div
             key={i}

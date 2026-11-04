@@ -158,6 +158,11 @@ export async function launch(fileNames, { width = 1400, height = 1100, author = 
           if (cmd === "read_file") return b64(window.__files[args.path]);
           if (cmd === "write_file") {
             const p = decodeURIComponent(options.headers.path);
+            // Simula un archivo que otro programa tiene abierto
+            if (window.__lockedWrites > 0) {
+              window.__lockedWrites--;
+              throw { locked: true, message: `«${p.split("/").pop()}» lo tiene abierto Adobe Acrobat Reader.` };
+            }
             const data = tob64(args);
             window.__writes.push({ path: p, b64: data });
             window.__files[p] = data;

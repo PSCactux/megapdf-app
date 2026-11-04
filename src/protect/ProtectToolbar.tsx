@@ -7,17 +7,18 @@ type Props = {
   pendingProtection: boolean;
   onTool: (t: ToolId) => void;
   onFind: () => void;
+  onPages: () => void;
   onApply: () => void;
   onPassword: () => void;
   onClean: () => void;
   onCompress: () => void;
 };
 
-export function ProtectToolbar({ tool, marks, pendingProtection, onTool, onFind, onApply, onPassword, onClean, onCompress }: Props) {
+export function ProtectToolbar({ tool, marks, pendingProtection, onTool, onFind, onPages, onApply, onPassword, onClean, onCompress }: Props) {
   const tools: { id: ToolId; label: string; title: string }[] = [
     { id: "select", label: "↖", title: t("Seleccionar") },
-    { id: "redact-area", label: t("▭ Redactar área"), title: t("Marca un área para borrarla") },
-    { id: "redact-text", label: t("T̶ Redactar texto"), title: t("Marca texto para borrarlo") },
+    { id: "redact-area", label: t("▭ Censurar zona"), title: t("Dibuja un recuadro sobre lo que quieras tapar y borrar (por ejemplo, el cuerpo de un correo)") },
+    { id: "redact-text", label: t("T̶ Censurar texto"), title: t("Selecciona el texto que quieras tapar y borrar") },
   ];
   return (
     <div className="toolbar annot-toolbar">
@@ -27,9 +28,12 @@ export function ProtectToolbar({ tool, marks, pendingProtection, onTool, onFind,
             {b.label}
           </button>
         ))}
-        <button onClick={onFind}>{t("Buscar y redactar…")}</button>
+        <button onClick={onPages} title={t("Tapa y borra páginas completas, por ejemplo el resto de un correo largo")}>
+          {t("Páginas enteras…")}
+        </button>
+        <button onClick={onFind}>{t("Buscar y censurar…")}</button>
         <button className="primary" disabled={!marks} onClick={onApply} title={t("Borra para siempre lo marcado")}>
-          {marks ? t("Aplicar redacciones ({n})", { n: marks }) : t("Aplicar redacciones")}
+          {marks ? t("Aplicar la censura ({n})", { n: marks }) : t("Aplicar la censura")}
         </button>
       </div>
       <div className="spacer" />

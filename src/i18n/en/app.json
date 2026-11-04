@@ -142,7 +142,7 @@
   "No se pudo quitar": "Couldn't remove",
   "No se pudo preparar la protección: {error}": "Couldn't prepare the protection: {error}",
   "No se pudieron marcar": "Couldn't mark them",
-  "No se pudieron aplicar las redacciones": "Couldn't apply the redactions",
+  "No se pudo aplicar la censura": "Couldn't apply the redactions",
   "No se pudo limpiar el documento": "Couldn't clean the document",
   "No se pudo añadir el texto reconocido": "Couldn't add the recognized text",
   "No se pudieron buscar los títulos: {error}": "Couldn't look for headings: {error}",
@@ -231,5 +231,8 @@
   "Quitado en la versión actual": "Removed in the current version",
   "Ahora: {text}": "Now: {text}",
   "«{name}» estaba dañado por un guardado anterior y se ha reparado al abrirlo. Guárdalo para conservar la reparación.": "“{name}” was damaged by an earlier save and has been repaired on opening. Save it to keep the repair.",
-  "No se ha guardado: el archivo resultante no se podía abrir bien. El documento abierto sigue igual; prueba con «Guardar como…».": "Not saved: the resulting file could not be opened correctly. The open document is unchanged; try “Save as…”."
+  "No se ha guardado: el archivo resultante no se podía abrir bien. El documento abierto sigue igual; prueba con «Guardar como…».": "Not saved: the resulting file could not be opened correctly. The open document is unchanged; try “Save as…”.",
+  "Reintentar": "Try again",
+  "Guardar como…": "Save as…",
+  "No se puede guardar": "Can't save"
 }

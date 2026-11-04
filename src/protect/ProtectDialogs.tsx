@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { parseRanges } from "../pdf/pages";
 import { ALL_PERMISSIONS, PATTERNS, type CleanOptions, type CleanReport, type CompressPreset, type Permissions, type Protection, type Security, type SensitiveHit } from "../pdf/security";
 import { t, tk } from "../i18n";
 
@@ -110,6 +111,54 @@ export function PasswordDialog({ security, signed, onApply, onCancel }: { securi
   );
 }
 
+/**
+ * Censurar páginas enteras: para lo que sigue en las páginas siguientes (por ejemplo, el cuerpo de un
+ * correo largo cuya cabecera, en la primera página, se tapa con «Censurar zona»).
+ */
+export function PagesRedactDialog({ pages, current, onMark, onCancel }: { pages: { width: number; height: number }[]; current: number; onMark: (hits: SensitiveHit[]) => void; onCancel: () => void }) {
+  const count = pages.length;
+  const [text, setText] = useState(current + 2 <= count ? `${current + 2}-${count}` : `${current + 1}`);
+  let chosen: number[] = [];
+  let problem: string | null = null;
+  try {
+    chosen = [...new Set(parseRanges(text, count).flat())].sort((a, b) => a - b);
+  } catch (e) {
+    problem = e instanceof Error ? e.message : String(e);
+  }
+  return (
+    <div className="modal-backdrop">
+      <form
+        className="modal"
+        aria-label={t("Censurar páginas enteras")}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (problem || !chosen.length) return;
+          onMark(chosen.map((page) => {
+            const { width: w, height: h } = pages[page];
+            return { page, kind: "text", text: t("Página {n} entera", { n: page + 1 }), quads: [[0, 0, w, 0, 0, h, w, h]] };
+          }));
+        }}
+      >
+        <h2>{t("Censurar páginas enteras")}</h2>
+        <label>
+          {t("Páginas (por ejemplo 2-5, 8)")}
+          <input autoFocus value={text} onChange={(e) => setText(e.target.value)} />
+        </label>
+        <p className="hint">{t("Para la primera página, donde suele estar lo que hay que dejar a la vista (remitente, destinatario, fecha), usa «Censurar zona» y tapa solo el texto.")}</p>
+        {problem && <p className="error-text">{problem}</p>}
+        <div className="modal-actions">
+          <button type="button" onClick={onCancel}>
+            {t("Cancelar")}
+          </button>
+          <button type="submit" className="primary" disabled={!!problem || !chosen.length}>
+            {chosen.length === 1 ? t("Marcar 1 página") : t("Marcar {n} páginas", { n: chosen.length })}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 type FindProps = {
   /** Páginas sin texto (escaneadas): en ellas no se puede buscar hasta pasarles el OCR. */
   scanned: number[];
@@ -142,13 +191,13 @@ export function FindRedactDialog({ scanned, onSearch, onMark, onRecognize, onCan
     <div className="modal-backdrop">
       <form
         className="modal modal-wide"
-        aria-label={t("Buscar y redactar")}
+        aria-label={t("Buscar y censurar")}
         onSubmit={(e) => {
           e.preventDefault();
           search();
         }}
       >
-        <h2>{t("Buscar y redactar")}</h2>
+        <h2>{t("Buscar y censurar")}</h2>
         {scanned.length > 0 && (
           <p className="error-text">
             {scanned.length === 1 ? t("1 página es una imagen sin texto y no se buscará en ella.") : t("{n} páginas son imágenes sin texto y no se buscará en ellas.", { n: scanned.length })}{" "}
@@ -203,7 +252,7 @@ export function FindRedactDialog({ scanned, onSearch, onMark, onRecognize, onCan
             {t("Cancelar")}
           </button>
           <button type="button" className="primary" disabled={!hits || !chosen.size} onClick={() => onMark(hits!.filter((_, i) => chosen.has(i)))}>
-            {chosen.size ? t("Marcar {n} para redactar", { n: chosen.size }) : t("Marcar para redactar")}
+            {chosen.size ? t("Marcar {n} para censurar", { n: chosen.size }) : t("Marcar para censurar")}
           </button>
         </div>
       </form>

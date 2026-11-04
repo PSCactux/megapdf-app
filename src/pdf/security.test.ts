@@ -100,6 +100,25 @@ describe("Redacción", () => {
     expect(r.search("b", "juan.garcia@example.com")).toHaveLength(1);
   });
 
+  it("censurar el cuerpo de un correo deja intacta la cabecera; también páginas enteras", () => {
+    const e = new Engine();
+    e.open("a", textPdf(LINES));
+    // Zona desde debajo de la primera línea («cabecera») hasta el final de la página
+    const body = { page: 0, kind: "text" as const, text: "", quads: [[0, 88, 595, 88, 0, 842, 595, 842]] as mupdf.Quad[] };
+    e.markRedactions("a", [body], "Ana");
+    e.applyRedactions("a");
+    const r = new Engine();
+    r.open("b", e.save("a"));
+    expect(r.search("b", "Expediente 2026/118")).toHaveLength(1);
+    for (const secret of ["Juan Garcia Lopez", "12345678Z", "juan.garcia", "612 345 678", "ES91"]) expect(r.search("b", secret), secret).toHaveLength(0);
+
+    // Página entera, como la marca el diálogo «Páginas enteras»
+    const whole = { page: 0, kind: "text" as const, text: "", quads: [[0, 0, 595, 0, 0, 842, 595, 842]] as mupdf.Quad[] };
+    r.markRedactions("b", [whole], "Ana");
+    r.applyRedactions("b");
+    expect(r.search("b", "Expediente")).toHaveLength(0);
+  });
+
   it("redactar un área borra la parte cubierta de una imagen y la pinta de negro", () => {
     const e = new Engine();
     e.open(

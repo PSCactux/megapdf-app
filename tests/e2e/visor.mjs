@@ -37,9 +37,17 @@ await view().getByTitle("Miniaturas").click();
 await wait(500);
 check(`miniaturas pintadas: ${await view().locator(".thumb canvas").count()}`, (await view().locator(".thumb canvas").count()) >= 3);
 
+// El archivo lo tiene abierto otro programa: se dice cuál y «Reintentar» lo guarda al quedar libre
+await page.evaluate(() => {
+  window.__lockedWrites = 1;
+  window.__dialogAnswer = "Reintentar";
+});
 await page.keyboard.press("Meta+Shift+s");
 await page.waitForFunction(() => window.__writes.length > 0);
+await page.evaluate(() => (window.__dialogAnswer = "Cancelar"));
 const [w] = await app.writes();
+const asked = await page.evaluate(() => window.__dialogs.find((d) => d.includes("lo tiene abierto")));
+check(`archivo ocupado: «${asked}» y reintentar`, !!asked);
 check(`guardar como → ${w.path}`, atob(w.b64.slice(0, 8)).startsWith("%PDF-"));
 
 await page.evaluate(() => window.__next_open.push(["/docs/protegido.pdf"]));

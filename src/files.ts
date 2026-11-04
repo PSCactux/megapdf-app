@@ -64,8 +64,17 @@ export async function readFile(path: string): Promise<Uint8Array> {
   return new Uint8Array(await invoke<ArrayBuffer>("read_file", { path }));
 }
 
+/** Error al guardar porque otro programa tiene el archivo abierto. */
+export class FileLockedError extends Error {}
+
 export async function writeFile(path: string, bytes: Uint8Array): Promise<void> {
-  await invoke("write_file", bytes, { headers: { path: encodeURIComponent(path) } });
+  try {
+    await invoke("write_file", bytes, { headers: { path: encodeURIComponent(path) } });
+  } catch (e) {
+    const err = e as { locked?: boolean; message?: string };
+    if (err?.message === undefined) throw e;
+    throw err.locked ? new FileLockedError(err.message) : new Error(err.message);
+  }
 }
 
 export const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;

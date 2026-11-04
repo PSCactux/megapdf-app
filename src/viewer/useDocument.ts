@@ -161,7 +161,7 @@ export function useDocument(docId: string, initialInfo: DocInfo, author: string,
     },
     findSensitive: (kinds: Exclude<SensitiveKind, "text">[], literal: string) => pdf.call("findSensitive", [docId, kinds, literal]),
     markRedactions: (hits: SensitiveHit[]) => change(t("No se pudieron marcar"), () => pdf.call("markRedactions", [docId, hits, author]), false),
-    applyRedactions: () => change(t("No se pudieron aplicar las redacciones"), () => pdf.call("applyRedactions", [docId])),
+    applyRedactions: () => change(t("No se pudo aplicar la censura"), () => pdf.call("applyRedactions", [docId])),
     removeHiddenInfo: (opts: CleanOptions) => change(t("No se pudo limpiar el documento"), () => pdf.call("removeHiddenInfo", [docId, opts]), false),
     compress: (preset: CompressPreset) => pdf.call("compress", [docId, preset]),
     addOcrText: async (pages: { page: number; words: OcrWord[]; rotate?: number }[]) => {

@@ -48,6 +48,63 @@ pub fn save_with(
     }
 }
 
+/// Programa que tiene abierto un archivo.
+pub struct Holder {
+    pub name: String,
+    /// La vista previa del Explorador de Windows (lo deja bloqueado mientras el archivo está seleccionado).
+    pub explorer: bool,
+}
+
+/// Quién tiene abierto el archivo, con el Administrador de reinicio de Windows (lo mismo que usa el
+/// Explorador para decir «el archivo está abierto en…»). Solo ve programas de este equipo: si el
+/// archivo está en la red y lo tiene abierto otra persona, la lista sale vacía.
+#[cfg(windows)]
+pub fn holders(path: &Path) -> Vec<Holder> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Foundation::{ERROR_MORE_DATA, ERROR_SUCCESS};
+    use windows_sys::Win32::System::RestartManager::{
+        CCH_RM_SESSION_KEY, RM_PROCESS_INFO, RmEndSession, RmExplorer, RmGetList, RmRegisterResources, RmStartSession,
+    };
+
+    let wide: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    let mut found = Vec::new();
+    // SAFETY: búferes del tamaño que pide la API; la sesión se cierra siempre.
+    unsafe {
+        let mut session = 0u32;
+        let mut key = [0u16; CCH_RM_SESSION_KEY as usize + 1];
+        if RmStartSession(&mut session, 0, key.as_mut_ptr()) != ERROR_SUCCESS {
+            return found;
+        }
+        let files = [wide.as_ptr()];
+        if RmRegisterResources(session, 1, files.as_ptr(), 0, std::ptr::null(), 0, std::ptr::null()) == ERROR_SUCCESS {
+            let (mut needed, mut count, mut reasons) = (0u32, 0u32, 0u32);
+            if RmGetList(session, &mut needed, &mut count, std::ptr::null_mut(), &mut reasons) == ERROR_MORE_DATA && needed > 0 {
+                let mut list: Vec<RM_PROCESS_INFO> = vec![std::mem::zeroed(); needed as usize];
+                count = needed;
+                if RmGetList(session, &mut needed, &mut count, list.as_mut_ptr(), &mut reasons) == ERROR_SUCCESS {
+                    for info in &list[..count as usize] {
+                        let raw = &info.strAppName;
+                        let name = String::from_utf16_lossy(&raw[..raw.iter().position(|&c| c == 0).unwrap_or(raw.len())]);
+                        let lower = name.to_lowercase();
+                        let explorer = info.ApplicationType == RmExplorer
+                            || ["explorer", "explorador", "preview", "vista previa", "prevhost"].iter().any(|w| lower.contains(w));
+                        if !found.iter().any(|h: &Holder| h.name == name) {
+                            found.push(Holder { name, explorer });
+                        }
+                    }
+                }
+            }
+        }
+        RmEndSession(session);
+    }
+    found
+}
+
+#[cfg(not(windows))]
+pub fn holders(_path: &Path) -> Vec<Holder> {
+    Vec::new()
+}
+
 /// Escribe el contenido en un archivo temporal de la misma carpeta y lo pone en lugar del original.
 fn replace_via_copy(path: &Path, bytes: &[u8], write: &mut impl FnMut(&Path, &[u8]) -> io::Result<()>) -> io::Result<()> {
     let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();

@@ -1,4 +1,4 @@
-// Fase 6: buscar y redactar, redactar área, limpiar, contraseña y permisos, reducir tamaño y desbloquear.
+// Fase 6: buscar y censurar, censurar zona, páginas enteras, aviso al guardar sin aplicar, limpiar, contraseña y permisos, reducir tamaño y desbloquear.
 import * as mupdf from "mupdf";
 import { check, dragAt, finish, launch } from "./helpers.mjs";
 
@@ -7,7 +7,7 @@ const { page, view, wait } = app;
 await app.open("datos.pdf");
 await view().getByRole("button", { name: "Tamaño real" }).click();
 await wait();
-await view().getByRole("tab", { name: "Proteger" }).click();
+await view().getByRole("tab", { name: "Censurar y proteger" }).click();
 
 // Reducir tamaño sobre el original (foto de 1800×1800 sin pérdida, ~9,7 MB)
 await view().getByRole("button", { name: "Reducir tamaño…" }).click();
@@ -23,26 +23,38 @@ check(`copia reducida en ${reduced.path}: ${Math.round((reduced.b64.length * 0.7
 
 
 // Buscar y marcar datos personales
-await view().getByRole("button", { name: "Buscar y redactar…" }).click();
+await view().getByRole("button", { name: "Buscar y censurar…" }).click();
 await page.getByLabel("Texto a buscar (opcional)").fill("Juan Garcia Lopez");
 await page.getByRole("button", { name: "Buscar", exact: true }).click();
 await page.waitForSelector(".hit-list");
 const found = await page.locator(".hit-list li").allInnerTexts();
 console.log(`  encontrado:\n   - ${found.join("\n   - ")}`);
 check(`resultados: ${found.length}`, found.length === 5);
-await page.getByRole("button", { name: /Marcar \d+ para redactar/ }).click();
+await page.getByRole("button", { name: /Marcar \d+ para censurar/ }).click();
 await wait();
 // Área: sobre la imagen (y de 342 a 542 en pantalla)
-await view().getByRole("button", { name: "Marca un área para borrarla" }).click();
+await view().getByRole("button", { name: /Dibuja un recuadro sobre lo que quieras tapar/ }).click();
 await dragAt(app, [320, 360], [420, 460]);
-const applyBtn = view().getByRole("button", { name: /Aplicar redacciones/ });
-check(`marcas: ${await applyBtn.textContent()}`, (await applyBtn.textContent()) === "Aplicar redacciones (6)");
+const applyBtn = view().getByRole("button", { name: /Aplicar la censura/ });
+check(`marcas: ${await applyBtn.textContent()}`, (await applyBtn.textContent()) === "Aplicar la censura (6)");
 await app.shot("proteger-marcas");
 
-await page.evaluate(() => (window.__dialogAnswer = "Aplicar redacciones"));
+// Páginas enteras: el diálogo propone las páginas y marca cuantas se pidan (aquí se cancela)
+await view().getByRole("button", { name: "Páginas enteras…" }).click();
+await page.getByLabel("Páginas (por ejemplo 2-5, 8)").fill("1");
+check("páginas enteras: marcar 1 página", (await page.locator(".modal button.primary").textContent()) === "Marcar 1 página");
+await page.getByRole("button", { name: "Cancelar" }).click();
+
+// Guardar con marcas sin aplicar avisa; cancelando no se escribe nada
+await page.evaluate(() => (window.__dialogAnswer = "Cancelar"));
+await page.keyboard.press("Meta+s");
+await wait();
+check("guardar con censura sin aplicar pregunta antes", (await app.writes()).length === 1);
+
+await page.evaluate(() => (window.__dialogAnswer = "Aplicar la censura"));
 await applyBtn.click();
-await page.waitForFunction(() => document.querySelector(".docview:not([hidden]) .annot-toolbar .primary")?.textContent === "Aplicar redacciones");
-check("redacciones aplicadas", true);
+await page.waitForFunction(() => document.querySelector(".docview:not([hidden]) .annot-toolbar .primary")?.textContent === "Aplicar la censura");
+check("censura aplicada", true);
 
 await view().getByRole("button", { name: "Eliminar información oculta…" }).click();
 await page.getByRole("button", { name: "Eliminar", exact: true }).click();

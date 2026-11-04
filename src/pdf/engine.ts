@@ -659,11 +659,11 @@ export class Engine {
   }
 
   markRedactions(id: string, hits: SensitiveHit[], author: string): number {
-    return this.operation(id, t("Marcar para redactar"), (doc) => security.markRedactions(doc, hits, author));
+    return this.operation(id, t("Marcar para censurar"), (doc) => security.markRedactions(doc, hits, author));
   }
 
   applyRedactions(id: string): number {
-    const applied = this.operation(id, t("Aplicar redacciones"), (doc) => security.applyRedactions(doc));
+    const applied = this.operation(id, t("Aplicar la censura"), (doc) => security.applyRedactions(doc));
     if (applied) this.mustRewrite.add(id);
     return applied;
   }

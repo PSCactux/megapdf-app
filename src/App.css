@@ -445,8 +445,18 @@ button.danger:hover:not(:disabled) { background: var(--error-bg); }
   gap: 20px 12px;
   user-select: none;
   -webkit-user-select: none;
+  position: relative;
 }
 .page-grid.is-dragging { cursor: grabbing; }
+.lasso {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: 2px;
+}
+@media (max-width: 1200px) { .organize-hint { display: none; } }
 .grid-item {
   position: relative;
   display: flex;

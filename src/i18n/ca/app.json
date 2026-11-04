@@ -142,7 +142,7 @@
   "No se pudo quitar": "No s'ha pogut treure",
   "No se pudo preparar la protección: {error}": "No s'ha pogut preparar la protecció: {error}",
   "No se pudieron marcar": "No s'han pogut marcar",
-  "No se pudieron aplicar las redacciones": "No s'han pogut aplicar les redaccions",
+  "No se pudo aplicar la censura": "No s'ha pogut aplicar la censura",
   "No se pudo limpiar el documento": "No s'ha pogut netejar el document",
   "No se pudo añadir el texto reconocido": "No s'ha pogut afegir el text reconegut",
   "No se pudieron buscar los títulos: {error}": "No s'han pogut cercar els títols: {error}",
@@ -231,5 +231,8 @@
   "Quitado en la versión actual": "Eliminat a la versió actual",
   "Ahora: {text}": "Ara: {text}",
   "«{name}» estaba dañado por un guardado anterior y se ha reparado al abrirlo. Guárdalo para conservar la reparación.": "«{name}» estava malmès per un desament anterior i s'ha reparat en obrir-lo. Desa'l per conservar la reparació.",
-  "No se ha guardado: el archivo resultante no se podía abrir bien. El documento abierto sigue igual; prueba con «Guardar como…».": "No s'ha desat: el fitxer resultant no es podia obrir bé. El document obert continua igual; prova «Desa com a…»."
+  "No se ha guardado: el archivo resultante no se podía abrir bien. El documento abierto sigue igual; prueba con «Guardar como…».": "No s'ha desat: el fitxer resultant no es podia obrir bé. El document obert continua igual; prova «Desa com a…».",
+  "Reintentar": "Torna-ho a provar",
+  "Guardar como…": "Desa com a…",
+  "No se puede guardar": "No es pot desar"
 }

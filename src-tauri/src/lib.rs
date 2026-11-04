@@ -20,10 +20,56 @@ fn read_file(path: String) -> Result<Response, String> {
         .map_err(|e| tr(&format!("No se pudo leer {path}: {e}"), &format!("Could not read {path}: {e}"), &format!("No s'ha pogut llegir {path}: {e}")))
 }
 
+/// Error al guardar. `locked`: el archivo lo tiene abierto otro programa (la interfaz ofrece
+/// reintentar o guardar con otro nombre).
+#[derive(serde::Serialize)]
+struct SaveError {
+    locked: bool,
+    message: String,
+}
+
+impl From<String> for SaveError {
+    fn from(message: String) -> Self {
+        SaveError { locked: false, message }
+    }
+}
+
+impl From<&str> for SaveError {
+    fn from(message: &str) -> Self {
+        message.to_string().into()
+    }
+}
+
+/// Explica quién tiene abierto el archivo y qué hacer.
+fn locked_message(path: &str) -> String {
+    let name = Path::new(path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.to_string());
+    let holders = save::holders(Path::new(path));
+    if holders.iter().any(|h| h.explorer) {
+        return tr(
+            &format!("«{name}» lo tiene bloqueado la vista previa del Explorador de Windows. En el Explorador, cierra el panel de vista previa (Alt+P) o selecciona otro archivo, y vuelve a guardar."),
+            &format!("“{name}” is locked by the File Explorer preview. In File Explorer, close the preview pane (Alt+P) or select another file, and save again."),
+            &format!("«{name}» el té bloquejat la previsualització de l'Explorador de Windows. A l'Explorador, tanca la subfinestra de previsualització (Alt+P) o selecciona un altre fitxer, i torna a desar."),
+        );
+    }
+    if !holders.is_empty() {
+        let apps = holders.iter().map(|h| h.name.as_str()).collect::<Vec<_>>().join(", ");
+        return tr(
+            &format!("«{name}» lo tiene abierto {apps}. Ciérralo ahí y vuelve a guardar, o guárdalo con otro nombre."),
+            &format!("“{name}” is open in {apps}. Close it there and save again, or save it under another name."),
+            &format!("«{name}» el té obert {apps}. Tanca'l allà i torna a desar, o desa'l amb un altre nom."),
+        );
+    }
+    tr(
+        &format!("«{name}» lo tiene abierto otro programa o alguien en otro equipo de la red (un visor de PDF, la vista previa del Explorador, el antivirus…). Ciérralo y vuelve a guardar, o guárdalo con otro nombre."),
+        &format!("“{name}” is open in another program or by someone on another computer on the network (a PDF viewer, the File Explorer preview, the antivirus…). Close it and save again, or save it under another name."),
+        &format!("«{name}» el té obert un altre programa o algú en un altre ordinador de la xarxa (un visor de PDF, la previsualització de l'Explorador, l'antivirus…). Tanca'l i torna a desar, o desa'l amb un altre nom."),
+    )
+}
+
 /// El cuerpo es el contenido en binario; la ruta va en la cabecera `path`, codificada como URI.
 /// Se guarda fuera del hilo de la ventana: si el archivo está ocupado se reintenta unos segundos.
 #[tauri::command]
-async fn write_file(request: Request<'_>) -> Result<(), String> {
+async fn write_file(request: Request<'_>) -> Result<(), SaveError> {
     let InvokeBody::Raw(bytes) = request.body() else {
         return Err("write_file espera un cuerpo binario".into());
     };
@@ -40,19 +86,14 @@ async fn write_file(request: Request<'_>) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         save::save(Path::new(&path), &bytes).map_err(|e| {
             if save::is_locked(&e) {
-                let name = Path::new(&path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.clone());
-                tr(
-                    &format!("«{name}» lo tiene abierto otro programa o alguien en otro equipo de la red (un visor de PDF, la vista previa del Explorador, el antivirus…). Ciérralo y vuelve a guardar, o usa «Guardar como…»."),
-                    &format!("“{name}” is open in another program or by someone on another computer on the network (a PDF viewer, the File Explorer preview, the antivirus…). Close it and save again, or use “Save as…”."),
-                    &format!("«{name}» el té obert un altre programa o algú en un altre ordinador de la xarxa (un visor de PDF, la previsualització de l'Explorador, l'antivirus…). Tanca'l i torna a desar, o fes servir «Desa com a…»."),
-                )
+                SaveError { locked: true, message: locked_message(&path) }
             } else {
-                tr(&format!("No se pudo guardar {path}: {e}"), &format!("Could not save {path}: {e}"), &format!("No s'ha pogut desar {path}: {e}"))
+                tr(&format!("No se pudo guardar {path}: {e}"), &format!("Could not save {path}: {e}"), &format!("No s'ha pogut desar {path}: {e}")).into()
             }
         })
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| SaveError::from(e.to_string()))?
 }
 
 /// PDF de una carpeta (y sus subcarpetas, si se pide), para buscar en todos ellos.
