@@ -12,7 +12,7 @@ import { xlsxToHtml } from "../convert/xlsx";
 import { htmlToPdf, textToHtml } from "../convert/render";
 import { pdfToDocx, pdfToImages, pdfToText, pdfToXlsx } from "../convert/export";
 import { type Change, compareDocuments } from "./compare";
-import { appendOutline, graftPages } from "./graft";
+import { type SignatureMode, appendOutline, countSigned, graftPages } from "./graft";
 import { repairXrefChain } from "./incremental";
 import * as review from "./review";
 import * as replace from "./replace";
@@ -845,11 +845,11 @@ export class Engine {
   }
 
   /** Inserta todas las páginas de otro PDF en la posición `at`. Devuelve cuántas. */
-  insertPdf(id: string, at: number, bytes: Uint8Array): number {
+  insertPdf(id: string, at: number, bytes: Uint8Array, signatures?: SignatureMode): number {
     const src = openSource(bytes);
     return this.operation(id, t("Insertar páginas"), (doc) => {
       const n = src.countPages();
-      graftPages(doc, at, src, range(n));
+      graftPages(doc, at, src, range(n), signatures);
       return n;
     });
   }
@@ -875,6 +875,15 @@ export class Engine {
     } finally {
       doc.destroy();
     }
+  }
+
+  /**
+   * Firmas digitales hechas en esas páginas (todas si no se dicen) de un documento abierto o de
+   * otro PDF: al copiarlas a otro documento dejan de valer y se pregunta qué hacer con ellas.
+   */
+  signedIn(source: string | Uint8Array, pages?: number[]): number {
+    const doc = typeof source === "string" ? this.pdf(source) : openSource(source);
+    return countSigned(doc, pages ?? range(doc.countPages()));
   }
 
   /** Cuántas páginas tiene otro PDF (para elegir cuáles usar de él). */
@@ -942,10 +951,10 @@ export class Engine {
   }
 
   /** Nuevo PDF con las páginas indicadas, en ese orden (anotaciones, campos y enlaces incluidos). */
-  extractPages(id: string, pages: number[]): Uint8Array {
+  extractPages(id: string, pages: number[], signatures?: SignatureMode): Uint8Array {
     const src = this.pdf(id);
     const out = new mupdf.PDFDocument();
-    graftPages(out, 0, src, pages);
+    graftPages(out, 0, src, pages, signatures);
     return out.saveToBuffer("garbage").asUint8Array().slice();
   }
 
@@ -994,13 +1003,13 @@ export class Engine {
    * Une varios PDF en uno nuevo, en el orden dado. Con `titles`, cada archivo tiene un marcador
    * con su nombre y sus propios marcadores dentro.
    */
-  merge(sources: Uint8Array[], titles?: string[]): Uint8Array {
+  merge(sources: Uint8Array[], titles?: string[], signatures?: SignatureMode): Uint8Array {
     const out = new mupdf.PDFDocument();
     let at = 0;
     sources.forEach((bytes, i) => {
       const src = openSource(bytes, i + 1);
       const n = src.countPages();
-      graftPages(out, at, src, range(n));
+      graftPages(out, at, src, range(n), signatures);
       if (titles) appendOutline(out, src, at, titles[i]);
       at += n;
     });

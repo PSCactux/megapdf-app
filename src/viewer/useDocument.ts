@@ -7,6 +7,7 @@ import type { CleanOptions, CompressPreset, Protection, Security, SensitiveHit, 
 import { pdf } from "../pdf/client";
 import { t } from "../i18n";
 import type { DocProperties, LinkTarget, Margins } from "../pdf/document";
+import type { SignatureMode } from "../pdf/graft";
 import type { Rect } from "../pdf/annotations";
 import type { ReviewState } from "../pdf/review";
 import type { LineMatch, ReplaceOptions } from "../pdf/replace";
@@ -96,7 +97,8 @@ export function useDocument(docId: string, initialInfo: DocInfo, author: string,
     deletePages: (pages: number[]) => change(t("No se pudieron eliminar las páginas"), () => pdf.call("deletePages", [docId, pages])),
     movePages: (pages: number[], to: number) => change(t("No se pudieron mover las páginas"), () => pdf.call("movePages", [docId, pages, to])),
     insertBlank: (at: number, size: PageSize) => change(t("No se pudo insertar la página"), () => pdf.call("insertBlankPage", [docId, at, size])),
-    insertPdf: (at: number, bytes: Uint8Array) => change(t("No se pudo insertar el PDF"), () => pdf.call("insertPdf", [docId, at, bytes])),
+    insertPdf: (at: number, bytes: Uint8Array, signatures?: SignatureMode) =>
+      change(t("No se pudo insertar el PDF"), () => pdf.call("insertPdf", [docId, at, bytes, signatures])),
     insertImages: (at: number, images: Uint8Array[]) => change(t("No se pudieron insertar las imágenes"), () => pdf.call("insertImages", [docId, at, images])),
     setFieldValue: (f: Field, value: string | boolean) => change(t("No se pudo rellenar el campo"), () => pdf.call("setFieldValue", [docId, f.page, f.id, value]), false),
     addField: (page: number, spec: NewField) => change(t("No se pudo crear el campo"), () => pdf.call("addField", [docId, page, spec]), false),

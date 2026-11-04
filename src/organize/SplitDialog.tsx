@@ -3,6 +3,7 @@ import type { DocInfo } from "../pdf/engine";
 import { pdf } from "../pdf/client";
 import { parseRanges, splitAtPages, splitEvery } from "../pdf/pages";
 import { joinPath, pickFolder, writeFile } from "../files";
+import { askSignatures } from "../sign/copySignatures";
 import { t } from "../i18n";
 
 type Mode = "every" | "bookmarks" | "ranges";
@@ -37,12 +38,14 @@ export function SplitDialog({ docId, info, baseName, onClose, onError }: Props) 
 
   async function split() {
     if (!("groups" in plan)) return;
+    const signatures = await askSignatures(docId);
+    if (!signatures) return;
     const folder = await pickFolder();
     if (!folder) return;
     setBusy(true);
     try {
       for (const [i, pages] of plan.groups.entries()) {
-        await writeFile(joinPath(folder, name(i)), await pdf.call("extractPages", [docId, pages]));
+        await writeFile(joinPath(folder, name(i)), await pdf.call("extractPages", [docId, pages, signatures]));
       }
       setDone(t("Se han creado {n} archivos en {folder}", { n: plan.groups.length, folder }));
     } catch (e) {

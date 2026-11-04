@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import type { DocInfo } from "../pdf/engine";
 import { clickSelection, positionsAfterMove } from "../pdf/pages";
 import { pickImages, pickPdfs, readFile } from "../files";
+import { askSignatures } from "../sign/copySignatures";
 import type { DocumentState } from "../viewer/useDocument";
 import { LazyPage, tabUnder } from "../viewer/Thumbnails";
 import { outsideWindow } from "../viewer/dropTarget";
@@ -154,7 +155,9 @@ export function OrganizeView({ docId, info, doc, baseName, selection, anchor, on
     for (const path of await pickPdfs()) {
       const bytes = await readPdf(path);
       if (!bytes) return;
-      const n = await doc.insertPdf(at, bytes);
+      const signatures = await askSignatures(bytes);
+      if (!signatures) return;
+      const n = await doc.insertPdf(at, bytes, signatures);
       if (n === null) return;
       at += n;
     }

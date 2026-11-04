@@ -207,6 +207,28 @@ describe("Firma digital", () => {
     expect(() => sign(both, "2", { fieldId: empty.id })).toThrow("ya está firmado");
   });
 
+  it("al sacar una página firmada, la firma queda como imagen o se quita, nunca como campo para firmar", () => {
+    const e = new Engine();
+    e.open("a", blankPdf(2));
+    e.addField("a", 1, { kind: "signature", rect: [72, 700, 272, 760], name: "Vacía" });
+    const v = new Engine();
+    v.open("s", sign(e, "a", { rect: [72, 600, 300, 680] }));
+    expect(v.signedIn("s")).toBe(1);
+    expect(v.signedIn("s", [1])).toBe(0);
+    const out = new Engine();
+    out.open("img", v.extractPages("s", [0], "image"));
+    expect(out.fields("img")).toHaveLength(0);
+    expect(out.signedIn("img")).toBe(0);
+    // Se sigue viendo: el texto de la firma está en la página
+    expect(out.pageText("img", 0)).toContain("Firmado digitalmente por");
+    out.open("sin", v.extractPages("s", [0], "remove"));
+    expect(out.fields("sin")).toHaveLength(0);
+    expect(out.pageText("sin", 0)).not.toContain("Firmado digitalmente por");
+    // Los campos de firma vacíos sí se copian: son parte de un formulario
+    out.open("todo", v.extractPages("s", [0, 1], "remove"));
+    expect(out.fields("todo").map((f) => [f.page, f.kind, f.signed])).toEqual([[1, "signature", false]]);
+  });
+
   it("rechaza contraseña incorrecta y certificados caducados", () => {
     const e = new Engine();
     e.open("a", blankPdf());

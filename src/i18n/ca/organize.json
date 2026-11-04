@@ -272,5 +272,10 @@
   "no se pudo cerrar: {error}": "no s'ha pogut tancar: {error}",
   "Varias: arrastra un recuadro sobre el fondo o usa ⇧+clic": "Diverses: arrossega un requadre sobre el fons o fes servir ⇧+clic",
   "Seleccionar todas las páginas (Ctrl/⌘+A)": "Selecciona totes les pàgines (Ctrl/⌘+A)",
-  "Seleccionar todas": "Selecciona-les totes"
+  "Seleccionar todas": "Selecciona-les totes",
+  "Quitar las firmas": "Treure les signatures",
+  "Dejarlas como imagen": "Deixar-les com a imatge",
+  "Firmas digitales": "Signatures digitals",
+  "Las páginas llevan 1 firma digital, que en el nuevo documento ya no sería válida. Puedes quitarla o dejarla como imagen: se ve igual, pero ya no es una firma.": "Les pàgines porten 1 signatura digital, que en el document nou ja no seria vàlida. Pots treure-la o deixar-la com a imatge: es veu igual, però ja no és una signatura.",
+  "Las páginas llevan {n} firmas digitales, que en el nuevo documento ya no serían válidas. Puedes quitarlas o dejarlas como imagen: se ven igual, pero ya no son firmas.": "Les pàgines porten {n} signatures digitals, que en el document nou ja no serien vàlides. Pots treure-les o deixar-les com a imatge: es veuen igual, però ja no són signatures."
 }

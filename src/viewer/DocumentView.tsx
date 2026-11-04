@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DocInfo, PageSize, SearchHit } from "../pdf/engine";
 import { pdf } from "../pdf/client";
+import { askSignatures } from "../sign/copySignatures";
 import { type ViewLayout, clampZoom, fitWidthZoom, GAP, pageAt, pageRows, placePages, quadRect, renderScale, stepZoom, visibleRange } from "./layout";
 import { Presentation } from "./Presentation";
 import { ReadAloud } from "./ReadAloud";
@@ -390,7 +391,9 @@ export function DocumentView({
         if (/\.pdf$/i.test(path)) {
           const bytes = await readPdf(path);
           if (!bytes) return;
-          const n = await doc.insertPdf(at, bytes);
+          const signatures = await askSignatures(bytes);
+          if (!signatures) return;
+          const n = await doc.insertPdf(at, bytes, signatures);
           if (n === null) return;
           at += n;
         } else {
@@ -407,15 +410,17 @@ export function DocumentView({
     try {
       const base = baseName(name);
       const groups = spec.separate ? spec.pages.map((p) => [p]) : [spec.pages];
+      const signatures = await askSignatures(docId, spec.pages);
+      if (!signatures) return;
       const label = (pages: number[]) =>
         pages.length === 1 ? t("{name} (página {pages}).pdf", { name: base, pages: describePages(pages) }) : t("{name} (páginas {pages}).pdf", { name: base, pages: describePages(pages) });
       if (spec.destination === "file" && spec.separate) {
         const folder = await pickFolder();
         if (!folder) return;
-        for (const g of groups) await writeFile(joinPath(folder, label(g)), await pdf.call("extractPages", [docId, g]));
+        for (const g of groups) await writeFile(joinPath(folder, label(g)), await pdf.call("extractPages", [docId, g, signatures]));
       } else {
         for (const g of groups) {
-          const bytes = await pdf.call("extractPages", [docId, g]);
+          const bytes = await pdf.call("extractPages", [docId, g, signatures]);
           if (spec.destination === "tab") onOpenBytes(bytes, label(g));
           else await onSaveCopy(bytes, label(g));
         }

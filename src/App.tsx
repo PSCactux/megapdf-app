@@ -8,6 +8,7 @@ import { WebviewWindow, getCurrentWebviewWindow } from "@tauri-apps/api/webviewW
 import { message as dialog } from "@tauri-apps/plugin-dialog";
 import type { DocInfo } from "./pdf/engine";
 import { pdf } from "./pdf/client";
+import { askSignatures } from "./sign/copySignatures";
 import { baseName, dirName, FileLockedError, fileName, joinPath, pickConvertible, pickPdfs, pickSavePath, readFile, writeFile } from "./files";
 import { DocumentView, type Jump } from "./viewer/DocumentView";
 import { FolderSearchDialog } from "./search/FolderSearchDialog";
@@ -158,7 +159,9 @@ export default function App() {
     const target = tabsRef.current.find((t) => t.id === to);
     if (!target) return;
     try {
-      const bytes = await pdf.call("extractPages", [from, pages]);
+      const signatures = await askSignatures(from, pages);
+      if (!signatures) return;
+      const bytes = await pdf.call("extractPages", [from, pages, signatures]);
       const at = (await pdf.call("info", [to])).pages.length;
       await pdf.call("insertPdf", [to, at, bytes]);
       setCommand((c) => ({ name: "refresh", n: (c?.n ?? 0) + 1, target: to }));
@@ -183,7 +186,9 @@ export default function App() {
       const target = await invoke<{ label: string; x: number; y: number } | null>("window_at", { from: thisWindow.label, x: screenX, y: screenY });
       if (!target) return setNotice({ kind: "info", text: t("Para copiar páginas a otro documento, suéltalas sobre otra ventana de MegaPDF o sobre la pestaña del documento") });
       const name = tabsRef.current.find((t) => t.id === from)?.name ?? t("otro documento");
-      const token = await invoke<string>("stash_document", await pdf.call("extractPages", [from, pages]));
+      const signatures = await askSignatures(from, pages);
+      if (!signatures) return;
+      const token = await invoke<string>("stash_document", await pdf.call("extractPages", [from, pages, signatures]));
       await emitTo(target.label, "drop-pages", { token, x: target.x, y: target.y, count: pages.length, from: name });
     } catch (e) {
       showError(t("No se pudieron pasar las páginas a la otra ventana: {error}", { error: message(e) }));

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { pdf } from "../pdf/client";
 import { baseName, fileName, pickPdfs } from "../files";
+import { askSignatures } from "../sign/copySignatures";
 import { usePdfPassword } from "./usePdfPassword";
 import { t } from "../i18n";
 
@@ -33,7 +34,9 @@ export function MergeDialog({ onClose, onMerged, onError }: Props) {
         if (!bytes) return setBusy(false);
         sources.push(bytes);
       }
-      onMerged(await pdf.call("merge", [sources, paths.map((p) => baseName(fileName(p)))]));
+      const signatures = await askSignatures(sources);
+      if (!signatures) return setBusy(false);
+      onMerged(await pdf.call("merge", [sources, paths.map((p) => baseName(fileName(p))), signatures]));
     } catch (e) {
       onError(t("No se pudieron combinar los archivos: {error}", { error: e instanceof Error ? e.message : String(e) }));
       setBusy(false);

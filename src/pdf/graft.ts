@@ -12,6 +12,12 @@ const INHERITED = ["FT", "Ff", "V", "DV", "DA", "Q", "Opt", "MaxLen"];
 /** Claves que enlazan con el documento original (arrastrarían todo él) o que MuPDF regenera. */
 const SKIP = new Set(["P", "Popup", "Parent", "IRT"]);
 
+/**
+ * Qué hacer con las firmas digitales hechas, que en otro documento ya no valen: dejar solo cómo
+ * se ven (dibujadas en la página, sin ser firma) o quitarlas. Nunca quedan como campo para firmar.
+ */
+export type SignatureMode = "image" | "remove";
+
 type Copy = {
   dst: mupdf.PDFDocument;
   src: mupdf.PDFDocument;
@@ -25,7 +31,7 @@ type Copy = {
 };
 
 /** Copia las páginas `indices` de `src` en `dst` a partir de la posición `at`, en ese orden. */
-export function graftPages(dst: mupdf.PDFDocument, at: number, src: mupdf.PDFDocument, indices: number[]) {
+export function graftPages(dst: mupdf.PDFDocument, at: number, src: mupdf.PDFDocument, indices: number[], signatures: SignatureMode = "image") {
   const map = dst.newGraftMap();
   indices.forEach((p, k) => map.graftPage(at + k, src, p));
   const pages = new Map(indices.map((p, k) => [src.findPage(p).asIndirect(), dst.findPage(at + k)]));
@@ -35,15 +41,104 @@ export function graftPages(dst: mupdf.PDFDocument, at: number, src: mupdf.PDFDoc
     if (!annots.isArray()) return;
     const page = dst.findPage(at + k);
     const copied = dst.newArray();
+    const drawn: string[] = [];
     // Se trabaja con las referencias: al resolverlas se pierde su número de objeto
     annots.forEach((annot) => {
-      const subtype = annot.get("Subtype").asName();
-      const out =
-        subtype === "Popup" ? null : subtype === "Widget" ? copyWidget(copy, annot, page) : subtype === "Link" ? copyLink(copy, annot, page) : copyAnnot(copy, annot, page);
-      if (out) copied.push(out);
+      if (!resolved(annot).isDictionary()) return; // referencia a un objeto que no existe
+      // Una anotación que no se entiende se deja fuera: no impide copiar la página
+      try {
+        const subtype = annot.get("Subtype").asName();
+        if (subtype === "Widget" && isSigned(annot)) {
+          const draw = signatures === "image" ? drawAppearance(copy, annot, page) : null;
+          if (draw) drawn.push(draw);
+          return;
+        }
+        const out =
+          subtype === "Popup" ? null : subtype === "Widget" ? copyWidget(copy, annot, page) : subtype === "Link" ? copyLink(copy, annot, page) : copyAnnot(copy, annot, page);
+        if (out) copied.push(out);
+      } catch (e) {
+        console.warn("Anotación no copiada", e);
+      }
     });
     page.put("Annots", copied);
+    if (drawn.length) appendContent(dst, page, drawn.join("\n"));
   });
+}
+
+/** Firmas digitales hechas que hay en esas páginas. */
+export function countSigned(doc: mupdf.PDFDocument, indices: number[]): number {
+  let n = 0;
+  for (const p of indices) {
+    const annots = doc.findPage(p).get("Annots");
+    if (annots.isArray()) annots.forEach((a) => void (a.get("Subtype").asName() === "Widget" && isSigned(a) && n++));
+  }
+  return n;
+}
+
+/**
+ * El objeto al que apunta una referencia (o el propio objeto). Ojo: el Null de mupdf.js no
+ * admite get() ni forEach(), así que se comprueba antes de seguir por él.
+ */
+function resolved(o: mupdf.PDFObject): mupdf.PDFObject {
+  return o.isIndirect() ? o.resolve() : o;
+}
+
+/** Los `n` primeros números de un array del PDF; null si no lo es. */
+function numbers(o: mupdf.PDFObject, n: number): number[] | null {
+  const a = o.isNull() ? o : resolved(o);
+  if (!a.isArray() || a.length < n) return null;
+  return Array.from({ length: n }, (_, i) => a.get(i).asNumber());
+}
+
+function isSigned(widget: mupdf.PDFObject): boolean {
+  return widget.getInheritable("FT").asName() === "Sig" && !widget.getInheritable("V").isNull();
+}
+
+// --- Firmas como dibujo --------------------------------------------------------
+
+/**
+ * Añade la apariencia de la firma a los recursos de la página y devuelve las órdenes que la
+ * pintan en su sitio (como hace el visor: el BBox transformado se ajusta al Rect).
+ */
+function drawAppearance(c: Copy, widget: mupdf.PDFObject, page: mupdf.PDFObject): string | null {
+  const flags = widget.get("F").isNull() ? 0 : widget.get("F").asNumber();
+  if (flags & (2 | 32)) return null; // oculta o sin mostrar en pantalla
+  let ap = widget.get("AP", "N");
+  if (!ap.isStream() && ap.isDictionary()) ap = ap.get(widget.get("AS").asName());
+  if (!ap.isStream()) return null;
+  const r = numbers(widget.get("Rect"), 4), b = numbers(ap.get("BBox"), 4);
+  if (!r || !b) return null;
+  const rect = [Math.min(r[0], r[2]), Math.min(r[1], r[3]), Math.max(r[0], r[2]), Math.max(r[1], r[3])];
+  const [b0, b1, b2, b3] = b;
+  const m = numbers(ap.get("Matrix"), 6) ?? [1, 0, 0, 1, 0, 0];
+  const corners = [[b0, b1], [b2, b1], [b0, b3], [b2, b3]].map(([x, y]) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]);
+  const xs = corners.map((p) => p[0]), ys = corners.map((p) => p[1]);
+  const box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  if (rect[2] - rect[0] < 1 || rect[3] - rect[1] < 1 || box[2] - box[0] <= 0 || box[3] - box[1] <= 0) return null; // firma invisible
+  const sx = (rect[2] - rect[0]) / (box[2] - box[0]), sy = (rect[3] - rect[1]) / (box[3] - box[1]);
+  let res = page.get("Resources");
+  if (res.isNull()) {
+    res = c.dst.newDictionary();
+    page.put("Resources", res);
+  }
+  if (res.get("XObject").isNull()) res.put("XObject", c.dst.newDictionary());
+  const xobjects = res.get("XObject");
+  let name = "Firma";
+  for (let n = 2; !xobjects.get(name).isNull(); n++) name = `Firma${n}`;
+  xobjects.put(name, c.map.graftObject(ap));
+  const num = (v: number) => +v.toFixed(4);
+  return `q ${[sx, 0, 0, sy, rect[0] - box[0] * sx, rect[1] - box[1] * sy].map(num).join(" ")} cm /${name} Do Q`;
+}
+
+/** Pinta encima del contenido de la página, sin que lo que ya había le cambie el estado gráfico. */
+function appendContent(doc: mupdf.PDFDocument, page: mupdf.PDFObject, ops: string) {
+  const old = page.get("Contents");
+  const contents = doc.newArray();
+  contents.push(doc.addStream("q\n", {}));
+  if (old.isArray()) old.forEach((s) => contents.push(s));
+  else if (!old.isNull()) contents.push(old);
+  contents.push(doc.addStream(`\nQ\n${ops}\n`, {}));
+  page.put("Contents", contents);
 }
 
 function copyAnnot(c: Copy, annot: mupdf.PDFObject, page: mupdf.PDFObject, skip: string[] = []): mupdf.PDFObject {
@@ -59,10 +154,9 @@ function copyAnnot(c: Copy, annot: mupdf.PDFObject, page: mupdf.PDFObject, skip:
 
 /** Los enlaces a otra página se rehacen si esa página también se copia; si no, se quitan. */
 function copyLink(c: Copy, annot: mupdf.PDFObject, page: mupdf.PDFObject): mupdf.PDFObject | null {
-  const action = annot.get("A");
-  const internal = !annot.get("Dest").isNull() || action.get("S").asName() === "GoTo";
+  const internal = !annot.get("Dest").isNull() || annot.get("A", "S").asName() === "GoTo";
   if (!internal) return copyAnnot(c, annot, page);
-  const dest = resolveDest(c.src, annot.get("Dest").isNull() ? action.get("D") : annot.get("Dest"));
+  const dest = resolveDest(c.src, annot.get("Dest").isNull() ? annot.get("A", "D") : annot.get("Dest"));
   const target = dest?.get(0);
   const to = target?.isIndirect() ? c.pages.get(target.asIndirect()) : undefined;
   if (!dest || !to) return null;
@@ -76,11 +170,13 @@ function copyLink(c: Copy, annot: mupdf.PDFObject, page: mupdf.PDFObject): mupdf
 
 /** Destino como array [página, tipo, …], resolviendo los destinos con nombre. */
 function resolveDest(doc: mupdf.PDFDocument, d: mupdf.PDFObject): mupdf.PDFObject | null {
+  if (d.isNull()) return null;
+  d = resolved(d);
   if (d.isArray()) return d;
   if (d.isDictionary()) return resolveDest(doc, d.get("D"));
   const root = doc.getTrailer().get("Root");
   if (d.isName()) {
-    const found = root.get("Dests").get(d.asName());
+    const found = root.get("Dests", d.asName());
     return found.isNull() ? null : resolveDest(doc, found);
   }
   if (d.isString()) {
@@ -115,7 +211,7 @@ function copyWidget(c: Copy, widget: mupdf.PDFObject, page: mupdf.PDFObject): mu
   // El campo es el propio widget (si tiene nombre) o su padre, que puede tener varios widgets
   const merged = !widget.get("T").isNull();
   const field = merged ? widget : widget.get("Parent");
-  if (field.isNull()) return null;
+  if (field.isNull() || !resolved(field).isDictionary()) return null;
   let target = merged ? undefined : c.fields.get(field.asIndirect());
   if (!target) {
     const form = acroForm(c);
@@ -171,7 +267,8 @@ function uniqueName(c: Copy, name: string): string {
 
 function existingNames(fields: mupdf.PDFObject, prefix = "", out = new Set<string>()): Set<string> {
   fields.forEach((ref) => {
-    const f = ref.resolve();
+    const f = resolved(ref);
+    if (!f.isDictionary()) return;
     const t = f.get("T");
     const name = t.isNull() ? prefix : prefix ? `${prefix}.${t.asString()}` : t.asString();
     if (name) out.add(name);

@@ -435,6 +435,38 @@ describe("Engine: campos y enlaces al copiar páginas", () => {
     expect(linkTargets(e.extractPages("a", [1, 0]))).toEqual([[1, 1], []]);
   });
 
+  it("copia páginas con anotaciones raras o rotas sin fallar", () => {
+    const doc = mupdf.Document.openDocument(makePdf(["uno", "dos"]), "application/pdf").asPDF()!;
+    const annot = (props: Record<string, unknown>) => {
+      const a = doc.addObject(doc.newDictionary());
+      a.put("Type", doc.newName("Annot"));
+      a.put("Rect", [72, 400, 200, 420]);
+      for (const [k, v] of Object.entries(props)) a.put(k, v as mupdf.PDFObject);
+      return a;
+    };
+    const annots = doc.newArray();
+    // Enlace sin destino ni acción, enlace a un destino con nombre que no existe, widget con un
+    // padre que no existe y una referencia a un objeto que no está
+    annots.push(annot({ Subtype: doc.newName("Link") }));
+    annots.push(annot({ Subtype: doc.newName("Link"), Dest: doc.newName("perdido") }));
+    annots.push(annot({ Subtype: doc.newName("Widget"), Parent: doc.newIndirect(9999) }));
+    annots.push(doc.newIndirect(9998));
+    doc.findPage(0).put("Annots", annots);
+    const broken = doc.saveToBuffer("").asUint8Array().slice();
+    // Y un destino cuyo formulario apunta a campos que no existen
+    const dst = mupdf.Document.openDocument(makePdf(["destino"]), "application/pdf").asPDF()!;
+    const form = dst.addObject(dst.newDictionary());
+    form.put("Fields", dst.newArray());
+    form.get("Fields").push(dst.newIndirect(9997));
+    dst.getTrailer().get("Root").put("AcroForm", form);
+    const e = new Engine();
+    e.open("d", dst.saveToBuffer("").asUint8Array().slice());
+    e.open("b", broken);
+    expect(e.insertPdf("d", 1, e.extractPages("b", [0, 1]))).toBe(2);
+    expect(e.insertPdf("d", 0, formPdf())).toBe(2);
+    expect(e.info("d").pages).toHaveLength(5);
+  });
+
   it("al unir dos formularios iguales se conservan los dos rellenables", () => {
     const e = new Engine();
     e.open("m", e.merge([formPdf(), formPdf()]));

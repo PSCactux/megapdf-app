@@ -272,5 +272,10 @@
   "no se pudo cerrar: {error}": "couldn't close: {error}",
   "Varias: arrastra un recuadro sobre el fondo o usa ⇧+clic": "Several: drag a box over the background or use ⇧+click",
   "Seleccionar todas las páginas (Ctrl/⌘+A)": "Select all pages (Ctrl/⌘+A)",
-  "Seleccionar todas": "Select all"
+  "Seleccionar todas": "Select all",
+  "Quitar las firmas": "Remove the signatures",
+  "Dejarlas como imagen": "Keep them as an image",
+  "Firmas digitales": "Digital signatures",
+  "Las páginas llevan 1 firma digital, que en el nuevo documento ya no sería válida. Puedes quitarla o dejarla como imagen: se ve igual, pero ya no es una firma.": "The pages have 1 digital signature, which would no longer be valid in the new document. You can remove it or keep it as an image: it looks the same, but it is no longer a signature.",
+  "Las páginas llevan {n} firmas digitales, que en el nuevo documento ya no serían válidas. Puedes quitarlas o dejarlas como imagen: se ven igual, pero ya no son firmas.": "The pages have {n} digital signatures, which would no longer be valid in the new document. You can remove them or keep them as an image: they look the same, but they are no longer signatures."
 }
