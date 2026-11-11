@@ -534,6 +534,7 @@ function redact(page: mupdf.PDFPage, rect: Rect, what: "text" | "image") {
   // Margen interior para no rozar las líneas vecinas
   const inset = what === "text" ? Math.min(2, (rect[3] - rect[1]) * 0.2) : 0;
   const own = detachOwn(page);
+  const restore = ownResources(page, own);
   try {
     const annot = page.createAnnotation("Redact");
     annot.setRect([rect[0] + ox, rect[1] + oy + inset, rect[2] + ox, rect[3] + oy - inset]);
@@ -541,7 +542,39 @@ function redact(page: mupdf.PDFPage, rect: Rect, what: "text" | "image") {
     else annot.applyRedaction(0, mupdf.PDFPage.REDACT_IMAGE_REMOVE, mupdf.PDFPage.REDACT_LINE_ART_NONE, mupdf.PDFPage.REDACT_TEXT_NONE);
   } finally {
     reattach(page, own);
+    restore();
   }
+}
+
+/**
+ * Recursos (fuentes, imágenes, transparencias) que usan los flujos propios de la página. Al
+ * redactar, los flujos propios están apartados y mupdf quita de los recursos lo que el contenido
+ * original ya no usa: sin reponerlos, un texto editado antes perdería su fuente (sale en otra
+ * fuente, con letras cambiadas o, en Vista Previa, no sale). Devuelve la función que los repone.
+ */
+function ownResources(page: mupdf.PDFPage, own: ReturnType<typeof detachOwn>): () => void {
+  if (!own) return () => {};
+  const res = page.getObject().getInheritable("Resources");
+  const kept: [string, string, mupdf.PDFObject][] = [];
+  const ops: Record<string, string> = { Tf: "Font", Do: "XObject", gs: "ExtGState" };
+  for (const stream of [...own.before, ...own.after]) {
+    const kind = kindOf(stream);
+    if (!kind || kind.startsWith("wrap")) continue;
+    for (const m of stream.readStream().asString().matchAll(/\/([^\s/[\]()<>{}%]+)\s+(?:[-\d.]+\s+(Tf)|(Do|gs)\b)/g)) {
+      const [name, op] = [m[1], m[2] ?? m[3]];
+      const ref = res.get(ops[op]).get(name);
+      if (!ref.isNull()) kept.push([ops[op], name, ref]);
+    }
+  }
+  return () => {
+    if (!kept.length) return;
+    const doc = page._doc;
+    const r = resources(doc, page);
+    for (const [category, name, ref] of kept) {
+      const sub = subdict(doc, r, category);
+      if (sub.get(name).isNull()) sub.put(name, ref);
+    }
+  };
 }
 
 // --- Encabezado, Bates y marca de agua --------------------------------------

@@ -56,6 +56,22 @@ describe("Fuentes del documento", () => {
     ]);
   });
 
+  it("lee códigos con espacios dentro sin correr las letras siguientes", () => {
+    const m = parseToUnicode("1 beginbfrange <0000> <0003> [<0041> <0066 0069> <0042> <00F3>] endbfrange", 4);
+    expect([...m]).toEqual([["A", "0000"], ["fi", "0001"], ["B", "0002"], ["ó", "0003"]]);
+  });
+
+  it("no escribe con letras que la fuente tiene con anchura 0 (se amontonarían)", () => {
+    // Fuente no incrustada que solo da anchura a las letras del texto original, como hacen
+    // algunos generadores de informes: la «v» y la «i» tienen anchura 0
+    const doc = new mupdf.PDFDocument();
+    const widths = Array.from({ length: 224 }, (_, i) => ("Hola mundo".includes(String.fromCharCode(32 + i)) ? 556 : 0));
+    const font = doc.addObject({ Type: "Font", Subtype: "TrueType", BaseFont: "ArialMT", FirstChar: 32, LastChar: 255, Widths: widths, Encoding: "WinAnsiEncoding" });
+    const parsed = parseFont(font)!;
+    expect(parsed.glyphs("Hola mundo")).not.toBeNull();
+    expect(parsed.glyphs("vil")).toBeNull();
+  });
+
   it("deduce la familia y la variante a pedir", () => {
     expect(familyOf("ABCDEF+Arial,Bold")).toBe("Arial");
     expect(familyOf("TimesNewRomanPS-BoldMT")).toBe("TimesNewRoman");
@@ -143,6 +159,32 @@ describe.skipIf(!ARIAL)("Editar texto conservando la fuente", () => {
     const parsed = parseFont(own[0])!;
     expect(parsed.glyphs("dios, Adiós")).not.toBeNull();
     expect(parsed.glyphs("Zeta")).toBeNull();
+  });
+
+  it("editar un segundo texto de la página no le quita la fuente al primero", () => {
+    // Dos líneas con fuentes distintas (Arial del documento y Times estándar)
+    const e = new Engine();
+    e.open("a", wordLikePdf("Hola mundo"));
+    e.addText("a", 0, { text: "Segunda línea", origin: [72, 200], style: { family: "serif", bold: false, italic: false, size: 12, color: [0, 0, 0] } });
+    const flat = mupdf.Document.openDocument(e.save("a"), "application/pdf").asPDF()!;
+    flat.findPage(0).get("Contents").forEach((c) => {
+      c.delete("MegaPDFKind");
+      c.delete("MegaPDFData");
+    });
+    const e2 = new Engine();
+    e2.open("b", flat.saveToBuffer("").asUint8Array().slice());
+    const blocks = e2.content("b", 0).blocks;
+    expect(blocks).toHaveLength(2);
+    e2.replaceBlock("b", 0, blocks[0], { ...blocks[0].data, text: "mundo Hola" });
+    e2.replaceBlock("b", 0, blocks[1], { ...blocks[1].data, text: "Otra línea" });
+    const saved = e2.save("b");
+    // Con la fuente perdida, mupdf la sustituye y la «í» (o todo el texto) sale mal
+    expect(textOf(saved).split("\n").filter(Boolean).sort()).toEqual(["Otra línea", "mundo Hola"]);
+    const doc = mupdf.Document.openDocument(saved, "application/pdf").asPDF()!;
+    const res = doc.findPage(0).get("Resources").get("Font");
+    for (const c of doc.findPage(0).get("Contents").isArray() ? Array.from({ length: doc.findPage(0).get("Contents").length }, (_, i) => doc.findPage(0).get("Contents").get(i)) : []) {
+      for (const [, name] of c.readStream().asString().matchAll(/\/(\S+)\s+[-\d.]+\s+Tf/g)) expect(res.get(name).isNull()).toBe(false);
+    }
   });
 
   it("edita un párrafo entero: mantiene caja, interlineado y alineación", () => {

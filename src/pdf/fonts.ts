@@ -216,6 +216,8 @@ export function parseFont(ref: mupdf.PDFObject): PdfFont | null {
     const widths = cidWidths(d.get("W"));
     const dw = d.get("DW").isNumber() ? d.get("DW").asNumber() : 1000;
     width = (code) => (widths.get(parseInt(code, 16)) ?? dw) / 1000;
+    // Igual que en las simples: un glifo de anchura 0 no sirve para escribir una letra
+    for (const [u, code] of [...map]) if (width(code) <= 0 && !/^[\s\p{M}]+$/u.test(u)) map.delete(u);
   } else if (subtype === "TrueType" || subtype === "Type1" || subtype === "MMType1") {
     const first = dict.get("FirstChar").isNumber() ? dict.get("FirstChar").asNumber() : 0;
     const list = dict.get("Widths");
@@ -234,6 +236,10 @@ export function parseFont(ref: mupdf.PDFObject): PdfFont | null {
       // Sin ToUnicode no se sabe qué letras tiene un subconjunto: solo las que tienen anchura
       if (embedded) for (const [u, code] of [...map]) if (w(parseInt(code, 16)) <= 0) map.delete(u);
     }
+    // Una letra con anchura 0 en /Widths no se puede escribir con esta fuente: los visores no
+    // avanzan tras ella y la siguiente se le monta encima («vi» amontonadas). Pasa con las
+    // fuentes no incrustadas o con ToUnicode completo que solo dan anchura a las letras usadas.
+    if (list.isArray()) for (const [u, code] of [...map]) if (w(parseInt(code, 16)) <= 0 && !/^[\s\p{M}]+$/u.test(u)) map.delete(u);
     // Sin Widths (fuentes estándar sin incrustar) se mide con la fuente equivalente de mupdf
     const fallback = list.isArray() ? null : standardMetrics(dict.get("BaseFont").isName() ? dict.get("BaseFont").asName() : "Helvetica");
     width = (code) => {
@@ -289,6 +295,9 @@ function toUnicodePairs(cmap: string): [string, string][] {
     if (hex.length === 2) units.push(parseInt(hex, 16));
     return String.fromCharCode(...units);
   };
+  // Los códigos pueden llevar espacios dentro («<0066 0069>», la ligadura «fi»): sin quitarlos no
+  // se leerían y, en un rango con lista, las letras siguientes quedarían corridas un puesto
+  cmap = cmap.replace(/<([0-9a-fA-F\s]*)>/g, (_, hex: string) => `<${hex.replace(/\s+/g, "")}>`);
   for (const [, body] of cmap.matchAll(/beginbfchar([\s\S]*?)endbfchar/g)) {
     for (const [, src, dst] of body.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]*)>/g)) out.push([src.toLowerCase(), utf16(dst)]);
   }
