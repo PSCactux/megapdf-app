@@ -67,6 +67,8 @@ genera solo la aplicación. El flujo `.github/workflows/build.yml` compila los i
   y paso de documentos entre ventanas (`stash_document`/`take_stashed`; la ventana nueva lo recibe con `?doc=`).
 - `src/print/`, `src/compare/` — imprimir y comparar versiones (`src/pdf/compare.ts`, diff de Myers).
 - `src/prefs.ts`, `src/Preferences.tsx` — preferencias (también el idioma) y documentos recientes.
+- `src/report/` — «Informar de un problema» (menú Ayuda y aviso de error): registro de errores de la sesión (`errorLog.ts`), el .zip que se
+  guarda (`report.ts`) y nombres de archivo fuera del informe (`privacy.ts`); datos técnicos del documento, sin contenido, en `src/pdf/diagnostics.ts`.
 - `src/i18n/` — idiomas: los textos se escriben en español dentro de `t("…")` y se traducen en `en/*.json` y `ca/*.json`;
   el menú nativo se traduce en `src-tauri/src/lib.rs`.
 - `tests/e2e/` — pruebas de interfaz con la parte nativa de Tauri simulada.

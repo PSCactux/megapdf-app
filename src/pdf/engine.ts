@@ -1,4 +1,5 @@
 import * as mupdf from "mupdf";
+import "./safeNull";
 import { moveOrder } from "./pages";
 import { type Field, type FieldPatch, type NewField, type SignatureAppearance, createField, deleteField, patchField, prepareSignatureField, readFields, resetFields, setFieldValue } from "./forms";
 import { type SignatureCheck, applySignature, loadIdentity, verifySignature } from "./sign";
@@ -22,6 +23,7 @@ import type { Cell } from "../convert/xlsxWriter";
 import { summaryPdf, summaryXlsx } from "./summary";
 import * as outline from "./outline";
 import * as docs from "./document";
+import { type DocDiagnostics, readDiagnostics } from "./diagnostics";
 import { type Snippet, findInText } from "./textSearch";
 import type { Bates, HeaderFooter, ImageBlock, Overlay, PageDecoration, TextBlock, TextData, TextLine, TextStyle, Watermark } from "./content";
 import { type Annot, type AnnotPatch, type NewAnnot, type Point, type Rect, createAnnot, pageOrigin, patchAnnot, readAnnot } from "./annotations";
@@ -718,6 +720,12 @@ export class Engine {
 
   properties(id: string): docs.DocProperties & docs.DocFacts & { fileSize: number } {
     return { ...docs.readProperties(this.pdf(id)), fileSize: this.fileBytes.get(id)?.length ?? 0 };
+  }
+
+  /** Datos técnicos del documento, sin su contenido, para «Informar de un problema». */
+  diagnostics(id: string): DocDiagnostics {
+    const doc = this.get(id);
+    return readDiagnostics(doc, this.fileBytes.get(id)?.length ?? 0, doc.asPDF() ? this.history(id).dirty : false);
   }
 
   setProperties(id: string, p: docs.DocProperties): void {

@@ -744,3 +744,19 @@ button.danger:hover:not(:disabled) { background: var(--error-bg); }
 .language-options { display: grid; gap: 8px; margin: 12px 0; }
 .language-option { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 15px; }
 .language-option.is-on { border-color: var(--accent, #2563eb); background: color-mix(in srgb, var(--accent, #2563eb) 8%, transparent); }
+
+/* Informar de un problema */
+.notice > span { flex: 1; }
+.notice-report { white-space: nowrap; text-decoration: underline; }
+.report-dialog { width: min(600px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; }
+.report-dialog .props-row button { border-color: var(--border); }
+.report-images { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow-y: auto; }
+.report-images li { display: flex; align-items: center; gap: 8px; }
+.report-images img { width: 48px; height: 32px; object-fit: cover; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); }
+.report-images .file-name { flex: 1; max-width: none; margin: 0; }
+.modal .report-warning { color: var(--error-text); background: var(--error-bg); border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+.report-summary { background: var(--bg); border-radius: 8px; padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; }
+.report-summary ul { margin: 0; padding-left: 18px; color: var(--muted); }
+.report-summary summary { color: var(--muted); }
+.report-preview { margin: 6px 0 0; max-height: 220px; overflow: auto; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+.report-saved-path { overflow-wrap: anywhere; }

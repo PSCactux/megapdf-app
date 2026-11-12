@@ -16,6 +16,8 @@ import { BatchDialog } from "./batch/BatchDialog";
 import { MergeDialog } from "./organize/MergeDialog";
 import { PreferencesDialog } from "./Preferences";
 import { LanguageDialog } from "./LanguageDialog";
+import { ReportDialog } from "./report/ReportDialog";
+import { logNotice } from "./report/errorLog";
 import { type Lang, closestLang, setLang, t } from "./i18n";
 import { type Prefs, type ReadingTheme, clearRecent, loadPrefs, loadReadingTheme, loadRecent, pushRecent, removeRecent, savePrefs, saveReadingTheme } from "./prefs";
 import "./App.css";
@@ -55,6 +57,7 @@ export default function App() {
   const [readingTheme, setReadingTheme] = useState<ReadingTheme>(loadReadingTheme);
   const [folderSearch, setFolderSearch] = useState(false);
   const [batch, setBatch] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const [jump, setJump] = useState<Jump | null>(null);
   const [recent, setRecent] = useState<string[]>(loadRecent);
   const [recentMenu, setRecentMenu] = useState(false);
@@ -70,7 +73,11 @@ export default function App() {
   activeRef.current = activeId;
   tabsRef.current = tabs;
 
-  const showError = useCallback((text: string) => setNotice({ kind: "error", text }), []);
+  /** Enseña un aviso de error y lo apunta para «Informar de un problema». */
+  const showError = useCallback((text: string) => {
+    logNotice(text);
+    setNotice({ kind: "error", text });
+  }, []);
 
   /** Cambia el idioma de la interfaz, del motor y del menú nativo. */
   function applyLanguage(lang: Lang) {
@@ -536,6 +543,7 @@ export default function App() {
     else if (name === "new-window") newWindow();
     else if (name === "folder-search") setFolderSearch(true);
     else if (name === "batch") setBatch(true);
+    else if (name === "report-problem") setReporting(true);
     else setCommand((c) => ({ name, n: (c?.n ?? 0) + 1, target: activeId }));
   };
   const runRef = useRef(runCommand);
@@ -703,6 +711,11 @@ export default function App() {
       {notice && (
         <div className={`notice notice-${notice.kind}`} role={notice.kind === "error" ? "alert" : "status"}>
           <span>{notice.text}</span>
+          {notice.kind === "error" && (
+            <button className="notice-report" onClick={() => setReporting(true)}>
+              {t("Informar de este problema")}
+            </button>
+          )}
           <button onClick={() => setNotice(null)}>×</button>
         </div>
       )}
@@ -815,6 +828,7 @@ export default function App() {
 
       {askLanguage && <LanguageDialog initial={askLanguage} onChoose={chooseLanguage} />}
       {batch && <BatchDialog onClose={() => setBatch(false)} />}
+      {reporting && <ReportDialog docs={tabs} activeId={activeId} onClose={() => setReporting(false)} />}
       {folderSearch && (
         <FolderSearchDialog
           onOpen={async (path, page, query) => {

@@ -4,7 +4,8 @@ export type WorkerRequest = { id: number; method: string; args: unknown[] } | { 
 export type WorkerResponse =
   | { ready: true }
   | { id: number; result: unknown }
-  | { id: number; error: string }
+  // `stack`: la traza del error en el worker, para «Informar de un problema»
+  | { id: number; error: string; stack?: string }
   | { id: number; cancelled: true };
 
 const engine = new Engine();
@@ -47,7 +48,7 @@ function drain() {
         : [];
     post({ id: req.id, result }, transfer as Transferable[]);
   } catch (err) {
-    post({ id: req.id, error: err instanceof Error ? err.message : String(err) });
+    post({ id: req.id, error: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined });
   }
   if (queue.length) schedule();
 }

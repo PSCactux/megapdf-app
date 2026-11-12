@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { message, open, save } from "@tauri-apps/plugin-dialog";
 import { t, tk } from "./i18n";
+import { notePath } from "./report/privacy";
 
 const PDF_FILTER = [{ name: "PDF", extensions: ["pdf"] }];
 // Formatos de imagen que MuPDF sabe leer
@@ -22,6 +23,12 @@ export async function pickImages(): Promise<string[]> {
   return picked ?? [];
 }
 
+/** Imágenes o capturas para adjuntar a un informe de problemas (cualquier formato habitual). */
+export async function pickScreenshots(): Promise<string[]> {
+  const picked = await open({ multiple: true, filters: [{ name: t("Imágenes"), extensions: [...IMAGE_EXTENSIONS, "webp", "heic"] }] });
+  return picked ?? [];
+}
+
 export async function pickCertificate(): Promise<string | null> {
   return open({ multiple: false, filters: [{ name: t("Certificado digital"), extensions: ["p12", "pfx"] }] });
 }
@@ -33,7 +40,9 @@ export async function pickAnyFiles(): Promise<string[]> {
 }
 
 export async function pickFolder(): Promise<string | null> {
-  return open({ directory: true });
+  const folder = await open({ directory: true });
+  if (folder) notePath(folder);
+  return folder;
 }
 
 /** Ruta para guardar; el filtro se elige por la extensión del nombre propuesto. */
@@ -61,6 +70,8 @@ export async function pickConvertible(): Promise<string[]> {
 }
 
 export async function readFile(path: string): Promise<Uint8Array> {
+  // Toda ruta que se lee o se escribe queda apuntada: no debe salir en un informe de problemas
+  notePath(path);
   return new Uint8Array(await invoke<ArrayBuffer>("read_file", { path }));
 }
 
@@ -68,6 +79,7 @@ export async function readFile(path: string): Promise<Uint8Array> {
 export class FileLockedError extends Error {}
 
 export async function writeFile(path: string, bytes: Uint8Array): Promise<void> {
+  notePath(path);
   try {
     await invoke("write_file", bytes, { headers: { path: encodeURIComponent(path) } });
   } catch (e) {

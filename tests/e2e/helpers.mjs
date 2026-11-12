@@ -52,6 +52,8 @@ export async function launch(fileNames, { width = 1400, height = 1100, author = 
       window.__clipboard = null;
       /** Direcciones abiertas en el navegador del sistema. */
       window.__opened = [];
+      /** Archivos enseñados en su carpeta (Finder o Explorador). */
+      window.__revealed = [];
       /** Imágenes copiadas al portapapeles: { width, height }. */
       window.__copiedImages = [];
       window.__images = {};
@@ -152,6 +154,13 @@ export async function launch(fileNames, { width = 1400, height = 1100, author = 
             window.__opened.push(args.url);
             return;
           }
+          if (cmd === "plugin:opener|reveal_item_in_dir") {
+            window.__revealed.push(...args.paths);
+            return;
+          }
+          // Versión de la app y del sistema, para «Informar de un problema»
+          if (cmd === "plugin:app|version") return "9.9.9";
+          if (cmd === "system_info") return { os: "macos", version: "15.5", arch: "aarch64" };
           if (cmd === "user_name") return author;
           // Sin Microsoft Office: se prueba el conversor propio
           if (cmd === "office_apps") return [];

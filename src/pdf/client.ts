@@ -1,6 +1,7 @@
 import type { Engine } from "./engine";
 import type { WorkerRequest, WorkerResponse } from "./worker";
 import { t } from "../i18n";
+import { logError } from "../report/errorLog";
 
 type Api = Pick<
   Engine,
@@ -11,7 +12,7 @@ type Api = Pick<
   | "fields" | "setFieldValue" | "addField" | "updateField" | "deleteField" | "resetForm" | "flatten" | "signatures" | "signDocument" | "certificateInfo"
   | "content" | "addText" | "addImage" | "updateOverlay" | "removeOverlay" | "replaceLine" | "replaceBlock" | "fontNeeded" | "loadFont" | "removeImage"
   | "decorations" | "setHeaderFooter" | "setBates" | "setWatermark" | "removeDecoration"
-  | "snapshot" | "markUnsaved"
+  | "snapshot" | "markUnsaved" | "diagnostics"
   | "pagesWithoutText" | "addOcrText" | "convertToPdf" | "imagesToPdf" | "exportDocx" | "exportXlsx" | "exportText" | "exportImages" | "compare"
   | "security" | "unlockOwner" | "setProtection" | "findSensitive" | "markRedactions" | "applyRedactions" | "removeHiddenInfo" | "compress"
 >;
@@ -21,7 +22,7 @@ type Method = keyof Api;
 class PdfClient {
   private worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
   private nextId = 1;
-  private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
+  private pending = new Map<number, { method: string; resolve: (v: unknown) => void; reject: (e: Error) => void }>();
   // MuPDF se inicializa con top-level await: no enviamos nada hasta que el worker avisa.
   private ready = new Promise<void>((resolve) => {
     this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
@@ -30,12 +31,15 @@ class PdfClient {
       const p = this.pending.get(msg.id);
       if (!p) return;
       this.pending.delete(msg.id);
-      if ("error" in msg) p.reject(new Error(msg.error));
+      if ("error" in msg) p.reject(this.failure(p.method, msg.error, msg.stack));
       else if ("cancelled" in msg) p.reject(new DOMException("Cancelado", "AbortError"));
       else p.resolve(msg.result);
     };
     this.worker.onerror = (e) => {
       const err = new Error(t("El motor PDF ha fallado: {error}", { error: e.message }));
+      // El worker entero ha caído: se apunta con lo que estaba haciendo y dónde
+      const doing = [...new Set([...this.pending.values()].map((p) => p.method))].join(", ");
+      logError("engine", `${doing}${e.filename ? ` @ ${e.filename}:${e.lineno}:${e.colno}` : ""}`, e.message);
       for (const p of this.pending.values()) p.reject(err);
       this.pending.clear();
     };
@@ -46,11 +50,19 @@ class PdfClient {
     signal?.throwIfAborted();
     const id = this.nextId++;
     const result = new Promise<ReturnType<Api[M]>>((resolve, reject) => {
-      this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
+      this.pending.set(id, { method, resolve: resolve as (v: unknown) => void, reject });
     });
     signal?.addEventListener("abort", () => this.send({ cancel: id }), { once: true });
     this.send({ id, method, args }, method === "open" ? [(args[1] as Uint8Array).buffer] : []);
     return result;
+  }
+
+  /** Error de una llamada al motor: lleva la traza del worker y queda apuntado para el informe de problemas. */
+  private failure(method: string, message: string, stack?: string): Error {
+    const err = new Error(message);
+    if (stack) err.stack = stack;
+    logError("engine", method, err);
+    return err;
   }
 
   private send(msg: WorkerRequest, transfer: Transferable[] = []) {

@@ -311,6 +311,7 @@ fn build_menu(app: &tauri::AppHandle, lang: &str) -> tauri::Result<Menu<tauri::W
         .item(&item("snapshot", "Copiar una zona como imagen", None)?)
         .item(&item("presentation", "Presentación", Some("CmdOrCtrl+L"))?);
     let window = SubmenuBuilder::new(app, t("Ventana")).minimize_with_text(t("Minimizar")).fullscreen_with_text(t("Pantalla completa"));
+    let help = SubmenuBuilder::new(app, t("Ayuda")).item(&item("report-problem", "Informar de un problema…", None)?);
     let menu = MenuBuilder::new(app);
     #[cfg(target_os = "macos")]
     let menu = menu.item(
@@ -328,7 +329,7 @@ fn build_menu(app: &tauri::AppHandle, lang: &str) -> tauri::Result<Menu<tauri::W
             .quit_with_text(t("Salir"))
             .build()?,
     );
-    menu.items(&[&file.build()?, &edit.build()?, &pages.build()?, &view.build()?, &window.build()?]).build()
+    menu.items(&[&file.build()?, &edit.build()?, &pages.build()?, &view.build()?, &window.build()?, &help.build()?]).build()
 }
 
 /// Textos del menú en el idioma de la interfaz (los mismos que traduce la parte web).
@@ -378,6 +379,8 @@ fn menu_text(lang: &str, es: &'static str) -> &'static str {
         "Ventana" => ("Window", "Finestra"),
         "Minimizar" => ("Minimize", "Minimitza"),
         "Pantalla completa" => ("Full Screen", "Pantalla completa"),
+        "Ayuda" => ("Help", "Ajuda"),
+        "Informar de un problema…" => ("Report a Problem…", "Informa d'un problema…"),
         "Acerca de MegaPDF" => ("About MegaPDF", "Quant a MegaPDF"),
         "Servicios" => ("Services", "Serveis"),
         "Ocultar MegaPDF" => ("Hide MegaPDF", "Amaga MegaPDF"),
@@ -397,6 +400,48 @@ fn menu_text(lang: &str, es: &'static str) -> &'static str {
 #[tauri::command]
 fn system_locale() -> Option<String> {
     sys_locale::get_locale()
+}
+
+/// Sistema operativo, su versión y la arquitectura, para «Informar de un problema».
+#[derive(serde::Serialize)]
+struct SystemInfo {
+    os: &'static str,
+    version: String,
+    arch: &'static str,
+}
+
+#[tauri::command]
+fn system_info() -> SystemInfo {
+    SystemInfo { os: std::env::consts::OS, version: os_version().unwrap_or_default(), arch: std::env::consts::ARCH }
+}
+
+#[cfg(target_os = "macos")]
+fn os_version() -> Option<String> {
+    let out = std::process::Command::new("sw_vers").arg("-productVersion").output().ok()?;
+    Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+/// `ver` contesta «Microsoft Windows [Versión 10.0.22631.4460]»: se toma solo el número.
+#[cfg(target_os = "windows")]
+fn os_version() -> Option<String> {
+    use std::os::windows::process::CommandExt;
+    // CREATE_NO_WINDOW: sin esto asoma una consola un instante
+    let out = std::process::Command::new("cmd").args(["/C", "ver"]).creation_flags(0x0800_0000).output().ok()?;
+    version_number(&String::from_utf8_lossy(&out.stdout))
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn os_version() -> Option<String> {
+    None
+}
+
+/// El número de versión («10.0.22631.4460») que hay dentro de un texto.
+#[cfg_attr(not(any(target_os = "windows", test)), allow(dead_code))]
+fn version_number(text: &str) -> Option<String> {
+    text.split(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .filter(|part| part.contains('.') && part.chars().any(|c| c.is_ascii_digit()))
+        .max_by_key(|part| part.len())
+        .map(str::to_string)
 }
 
 /// Idioma de la interfaz para los mensajes de error: 0 español, 1 inglés, 2 catalán.
@@ -451,7 +496,7 @@ pub fn run() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![read_file, write_file, user_name, office_apps, office_to_pdf, take_pending_files, print_window, stash_document, take_stashed, list_pdfs, window_at, fonts::system_font, system_locale, set_language])
+        .invoke_handler(tauri::generate_handler![read_file, write_file, user_name, office_apps, office_to_pdf, take_pending_files, print_window, stash_document, take_stashed, list_pdfs, window_at, fonts::system_font, system_locale, set_language, system_info])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
     app.run(|_handle, _event| {
@@ -462,4 +507,16 @@ pub fn run() {
             queue_files(_handle, pdf_args(files));
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn version_number_from_ver_output() {
+        assert_eq!(version_number("\r\nMicrosoft Windows [Versi\u{fffd}n 10.0.22631.4460]\r\n").as_deref(), Some("10.0.22631.4460"));
+        assert_eq!(version_number("Microsoft Windows [Version 10.0.19045.5011]").as_deref(), Some("10.0.19045.5011"));
+        assert_eq!(version_number("sin números. Nada"), None);
+    }
 }

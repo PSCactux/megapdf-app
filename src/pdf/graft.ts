@@ -1,4 +1,5 @@
 import * as mupdf from "mupdf";
+import "./safeNull";
 import { type OutlineItem, insertOutline } from "./outline";
 
 /**
@@ -70,14 +71,15 @@ export function countSigned(doc: mupdf.PDFDocument, indices: number[]): number {
   let n = 0;
   for (const p of indices) {
     const annots = doc.findPage(p).get("Annots");
-    if (annots.isArray()) annots.forEach((a) => void (a.get("Subtype").asName() === "Widget" && isSigned(a) && n++));
+    // Solo cuentan las anotaciones de verdad: en la lista puede haber huecos («null») o referencias rotas
+    if (annots.isArray()) annots.forEach((a) => void (resolved(a).isDictionary() && a.get("Subtype").asName() === "Widget" && isSigned(a) && n++));
   }
   return n;
 }
 
 /**
- * El objeto al que apunta una referencia (o el propio objeto). Ojo: el Null de mupdf.js no
- * admite get() ni forEach(), así que se comprueba antes de seguir por él.
+ * El objeto al que apunta una referencia (o el propio objeto). El Null de mupdf.js de por sí no
+ * admite get() ni resolve() (lo arregla ./safeNull), así que se comprueba antes de seguir por él.
  */
 function resolved(o: mupdf.PDFObject): mupdf.PDFObject {
   return o.isIndirect() ? o.resolve() : o;
